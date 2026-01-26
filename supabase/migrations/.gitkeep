@@ -1,0 +1,14 @@
+-- AIRVERO - Migraciones SQL
+-- 
+-- Este directorio contendrá las migraciones de la base de datos Supabase.
+-- Se implementarán en la Fase 1.
+--
+-- Tablas planificadas:
+-- - usuarios
+-- - perfil_peluqueria
+-- - servicios  
+-- - horarios
+-- - reservas
+-- - google_calendar_tokens
+--
+-- Ejecutar con: supabase db push
