@@ -31,7 +31,7 @@ export function SchedulePage() {
         // Asegurar que tenemos los 7 días
         const allDays: ScheduleData[] = []
         for (let i = 0; i < 7; i++) {
-            const existing = data?.find(s => s.day_of_week === i)
+            const existing = (data as any[])?.find(s => s.day_of_week === i)
             if (existing) {
                 allDays.push({
                     id: existing.id,
@@ -73,8 +73,8 @@ export function SchedulePage() {
         try {
             if (schedule.id) {
                 // Actualizar existente
-                await supabase
-                    .from('schedules')
+                await (supabase
+                    .from('schedules') as any)
                     .update({
                         start_time: schedule.start_time,
                         end_time: schedule.end_time,
@@ -83,8 +83,8 @@ export function SchedulePage() {
                     .eq('id', schedule.id)
             } else {
                 // Crear nuevo
-                const { data } = await supabase
-                    .from('schedules')
+                const { data } = await (supabase
+                    .from('schedules') as any)
                     .insert({
                         day_of_week: schedule.day_of_week,
                         start_time: schedule.start_time,

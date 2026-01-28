@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AIRVERO</string>
+    <string name="title_activity_main">AIRVERO</string>
+    <string name="package_name">com.airvero.app</string>
+    <string name="custom_url_scheme">com.airvero.app</string>
+</resources>

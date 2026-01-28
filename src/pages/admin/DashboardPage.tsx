@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Card, Button, Loader } from '@/components/ui'
-import { useAuth } from '@/context/AuthContext'
+// import { useAuth } from '@/context/AuthContext'
 import { requestGoogleToken, createGoogleEvent, loadGoogleScript } from '@/lib/google'
 
 // Tipos locales para el dashboard
@@ -21,7 +21,7 @@ interface NextBooking {
 }
 
 export function DashboardPage() {
-    const { user } = useAuth()
+    // const { user } = useAuth()
     const [stats, setStats] = useState<DashboardStats>({
         todayBookings: 0,
         pendingBookings: 0,
@@ -71,7 +71,7 @@ export function DashboardPage() {
             let syncedCount = 0
 
             // 3. Crear eventos
-            for (const booking of pendingBookings) {
+            for (const booking of (pendingBookings as any[])) {
                 // Cast seguro para TS
                 const serviceName = (booking.services as any)?.name || 'Servicio'
                 const clientName = (booking.profiles as any)?.full_name || 'Cliente'
@@ -99,8 +99,8 @@ export function DashboardPage() {
                     const googleEvent = await createGoogleEvent(token, event)
 
                     // 4. Actualizar reserva con ID
-                    await supabase
-                        .from('bookings')
+                    await (supabase
+                        .from('bookings') as any)
                         .update({ google_event_id: googleEvent.id } as any)
                         .eq('id', booking.id)
 

@@ -73,14 +73,14 @@ export function ServicesPage() {
         try {
             if (editingId) {
                 // Actualizar
-                await supabase
-                    .from('services')
+                await (supabase
+                    .from('services') as any)
                     .update(formData as any)
                     .eq('id', editingId)
             } else {
                 // Crear
-                await supabase
-                    .from('services')
+                await (supabase
+                    .from('services') as any)
                     .insert({ ...formData, sort_order: services.length + 1 } as any)
             }
 
@@ -98,7 +98,7 @@ export function ServicesPage() {
         if (!confirm('¿Estás seguro de eliminar este servicio?')) return
 
         try {
-            await supabase.from('services').delete().eq('id', id)
+            await (supabase.from('services') as any).delete().eq('id', id)
             fetchServices()
         } catch (error) {
             console.error('Error eliminando servicio:', error)
@@ -108,8 +108,8 @@ export function ServicesPage() {
 
     const toggleActive = async (service: Service) => {
         try {
-            await supabase
-                .from('services')
+            await (supabase
+                .from('services') as any)
                 .update({ is_active: !service.is_active } as any)
                 .eq('id', service.id)
             fetchServices()
