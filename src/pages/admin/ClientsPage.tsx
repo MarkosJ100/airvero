@@ -80,16 +80,24 @@ export function ClientsPage() {
         if (!confirm('¿Eliminar este contacto?')) return
 
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('clientes')
                 .delete()
                 .eq('id', id)
 
-            if (error) throw error
+            if (error) {
+                console.error('Error de Supabase al eliminar cliente:', error)
+                console.error('Detalles del error:', JSON.stringify(error, null, 2))
+                alert(`Error al eliminar cliente: ${error.message}`)
+                return
+            }
+
+            console.log('Cliente eliminado correctamente:', data)
+            alert('✅ Cliente eliminado correctamente')
             fetchClientes()
         } catch (error) {
-            console.error('Error deleting cliente:', error)
-            alert('Error al eliminar cliente')
+            console.error('Error inesperado eliminando cliente:', error)
+            alert('Error inesperado al eliminar cliente')
         }
     }
 

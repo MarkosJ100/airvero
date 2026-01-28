@@ -94,15 +94,42 @@ export function ServicesPage() {
         }
     }
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('¿Estás seguro de eliminar este servicio?')) return
+    const handleDelete = async (id: string, name: string) => {
+        if (!confirm(`¿Estás seguro de eliminar el servicio "${name}"?
+Esta acción es irreversible y podría fallar si hay reservas asociadas.`)) return
 
         try {
-            await (supabase.from('services') as any).delete().eq('id', id)
+            const { data, error } = await supabase
+                .from('services')
+                .delete()
+                .eq('id', id)
+                .select()
+
+            if (error) {
+                console.error('Error de Supabase al eliminar servicio:', error)
+
+                if (error.code === '23503') {
+                    alert('⛔ No se puede eliminar este servicio porque tiene reservas asociadas.\n\n💡 Solución: Edita el servicio y desmarca la casilla "Servicio activo" para ocultarlo al público sin perder el historial.')
+                } else if (error.code === '42501') {
+                    alert('⛔ No tienes permisos para eliminar servicios.\n\nSolo el administrador puede realizar esta acción.')
+                } else {
+                    alert(`Error al eliminar: ${error.message} (Código: ${error.code})`)
+                }
+                return
+            }
+
+            // Si no hay error pero tampoco data, es que no borró nada (posible RLS silencioso)
+            if (!data || data.length === 0) {
+                alert('⚠️ No se ha eliminado el servicio.\n\nPosible causa: No tienes permisos de administrador.')
+                return
+            }
+
+            // Exito
             fetchServices()
+            alert('✅ Servicio eliminado correctamente')
         } catch (error) {
-            console.error('Error eliminando servicio:', error)
-            alert('Error al eliminar el servicio')
+            console.error('Error inesperado eliminando servicio:', error)
+            alert('Error inesperado al eliminar el servicio.')
         }
     }
 
@@ -207,7 +234,7 @@ export function ServicesPage() {
                                     <Button
                                         variant="danger"
                                         size="sm"
-                                        onClick={() => handleDelete(service.id)}
+                                        onClick={() => handleDelete(service.id, service.name)}
                                     >
                                         🗑️
                                     </Button>

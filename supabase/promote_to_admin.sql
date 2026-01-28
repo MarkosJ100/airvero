@@ -12,7 +12,7 @@ SET role = 'admin'
 WHERE user_id = (
   SELECT id 
   FROM auth.users 
-  WHERE email = 'tu_email@ejemplo.com' -- <--- Pon tu email aquí
+  WHERE email = 'pruebaspubli100@gmail.com' -- <--- Pon tu email aquí
   LIMIT 1
 );
 
