@@ -42,7 +42,7 @@ export function CalendarPage() {
                 start_time,
                 end_time,
                 status,
-                profiles:client_id (full_name),
+                clientes:cliente_id (nombre),
                 services:service_id (name)
             `)
             .gte('booking_date', startStr)
@@ -55,7 +55,7 @@ export function CalendarPage() {
             start_time: b.start_time?.substring(0, 5) || '',
             end_time: b.end_time?.substring(0, 5) || '',
             status: b.status,
-            client_name: b.profiles?.full_name || 'Cliente',
+            client_name: b.clientes?.nombre || 'Cliente',
             service_name: b.services?.name || 'Servicio'
         }))
 
