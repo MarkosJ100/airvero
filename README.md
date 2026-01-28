@@ -1,18 +1,21 @@
-# AIRVERO
+# AIRVERO v2.0
 
-App de reservas para peluquería individual.
+App de gestión interna para peluquería (uso exclusivo admin).
 
 ## 📋 Descripción
 
-Aplicación web/Android para gestionar reservas de una única peluquería. Permite al profesional administrar servicios, horarios y citas, y a los clientes reservar de forma sencilla.
+Aplicación web/Android de gestión interna para una peluquera. **Solo la peluquera tiene acceso** para gestionar clientes, reservas, servicios y horarios de manera centralizada.
 
 **Características principales:**
+- ✅ Gestión de contactos internos (agenda de clientes)
+- ✅ Gestión de reservas manual (admin-only)
+- ✅ Integración con WhatsApp (confirmaciones manuales)
+- ✅ Agenda visual (calendario interno)
 - ✅ Gestión de servicios y horarios
-- ✅ Sistema de reservas
-- ✅ Integración con Google Calendar
 - ✅ App Android nativa (Capacitor)
+- ❌ Sin acceso para clientes
+- ❌ Sin registro público
 - ❌ Sin pagos ni Stripe
-- ❌ Sin marketplace (uso individual)
 
 ## 🛠️ Stack Tecnológico
 
@@ -22,8 +25,8 @@ Aplicación web/Android para gestionar reservas de una única peluquería. Permi
 | Build | Vite |
 | Estilos | CSS Vanilla |
 | Base de datos | Supabase (PostgreSQL) |
-| Autenticación | Supabase Auth |
-| Calendario | Google Calendar API |
+| Autenticación | Supabase Auth (solo admin) |
+| WhatsApp | Deep Links |
 | Mobile | Capacitor (Android) |
 
 ## 📁 Estructura del Proyecto
@@ -32,9 +35,11 @@ Aplicación web/Android para gestionar reservas de una única peluquería. Permi
 AIRVERO/
 ├── src/
 │   ├── components/    # Componentes reutilizables
-│   ├── pages/         # Páginas (admin/ y client/)
+│   ├── pages/
+│   │   ├── admin/    # Solo admin (Dashboard, Clientes, Reservas, etc.)
+│   │   └── auth/     # Solo Login
 │   ├── hooks/         # Custom hooks
-│   ├── lib/           # Supabase y utilidades
+│   ├── lib/           # Supabase, WhatsApp, utilidades
 │   ├── types/         # Tipos TypeScript
 │   └── styles/        # CSS global
 ├── supabase/          # Migraciones y seeds
@@ -76,16 +81,15 @@ Abre [http://localhost:5173](http://localhost:5173) en tu navegador.
 npm run build
 ```
 
-### 2. Añadir plataforma Android
-
-```bash
-npx cap add android
-```
-
-### 3. Sincronizar y abrir en Android Studio
+### 2. Sincronizar con Capacitor
 
 ```bash
 npx cap sync android
+```
+
+### 3. Abrir en Android Studio
+
+```bash
 npx cap open android
 ```
 
@@ -98,11 +102,31 @@ npx cap open android
 | `npm run preview` | Preview del build |
 | `npm run lint` | Verificar código |
 
-## 🗓️ Fases de Desarrollo
+## 🗂️ Funcionalidades v2.0
 
-1. **Fase 1 - Base de datos:** Modelo de datos en Supabase
-2. **Fase 2 - Interfaz:** UI para admin y clientes
-3. **Fase 3 - Backend:** Lógica de negocio y Google Calendar
+### 👥 Gestión de Clientes
+- Agenda de contactos interna (no son usuarios auth)
+- CRUD completo (crear, editar, eliminar)
+- Búsqueda por nombre y teléfono
+- Notas personalizadas
+- Botón WhatsApp directo
+
+### 📋 Gestión de Reservas
+- Crear reservas manualmente para cualquier cliente
+- Filtros por estado (pendiente, confirmada, completada)
+- Cambiar estados de reservas
+- WhatsApp para confirmar citas
+- Mensajes prellenados con detalles de la cita
+
+### 📅 Agenda Visual
+- Calendario interno (no sincronización automática)
+- Colores por estado de reserva
+- Vista clara de citas del día/semana
+
+### 💇 Servicios y Horarios
+- Gestión de servicios ofrecidos
+- Configuración de horarios semanales
+- Ajustes del negocio
 
 ## 📄 Licencia
 
