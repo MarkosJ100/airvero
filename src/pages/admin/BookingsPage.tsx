@@ -103,8 +103,12 @@ export function BookingsPage() {
         }
     }
 
-    async function deleteBooking(id: string) {
-        if (!confirm('¿Eliminar esta reserva?')) return
+    async function deleteBooking(id: string, clienteName: string) {
+        const confirmed = window.confirm(
+            `¿Estás seguro de eliminar la reserva de ${clienteName}?\n\nEsta acción no se puede deshacer.`
+        )
+
+        if (!confirmed) return
 
         try {
             const { error } = await supabase
@@ -114,8 +118,10 @@ export function BookingsPage() {
 
             if (error) throw error
             fetchData()
+            alert('✅ Reserva eliminada correctamente')
         } catch (error) {
             console.error('Error deleting booking:', error)
+            alert('❌ Error al eliminar la reserva')
         }
     }
 
@@ -137,7 +143,7 @@ export function BookingsPage() {
             <div className="page-header">
                 <h1>📋 Reservas</h1>
                 <button onClick={() => setShowModal(true)} className="btn btn-primary">
-                    + Nueva Reserva
+                    ➕ Nueva Reserva
                 </button>
             </div>
 
@@ -146,25 +152,25 @@ export function BookingsPage() {
                     className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
                     onClick={() => setFilter('all')}
                 >
-                    Todas
+                    Todas ({bookings.length})
                 </button>
                 <button
                     className={`filter-btn ${filter === 'pendiente' ? 'active' : ''}`}
                     onClick={() => setFilter('pendiente')}
                 >
-                    Pendientes
+                    🟡 Pendientes ({bookings.filter(b => b.status === 'pendiente').length})
                 </button>
                 <button
                     className={`filter-btn ${filter === 'confirmada' ? 'active' : ''}`}
                     onClick={() => setFilter('confirmada')}
                 >
-                    Confirmadas
+                    🟢 Confirmadas ({bookings.filter(b => b.status === 'confirmada').length})
                 </button>
             </div>
 
             <div className="bookings-list">
                 {filteredBookings.map((booking) => {
-                    const cliente = booking.clientes as unknown as Cliente
+                    const cliente = booking.cliente as Cliente
                     const service = services.find(s => s.id === booking.service_id)
 
                     return (
@@ -172,7 +178,7 @@ export function BookingsPage() {
                             <div className="booking-header">
                                 <div className="booking-info">
                                     <h3>{cliente?.nombre || 'Cliente no encontrado'}</h3>
-                                    <p className="service-name">{service?.name || 'Servicio'}</p>
+                                    <p className="service-name">💇 {service?.name || 'Servicio'}</p>
                                 </div>
                                 <button
                                     onClick={() => {
@@ -186,37 +192,54 @@ export function BookingsPage() {
                                     className="btn-whatsapp"
                                     title="Confirmar por WhatsApp"
                                 >
-                                    📱
+                                    <span className="whatsapp-icon">📱</span>
+                                    <span className="whatsapp-text">WhatsApp</span>
                                 </button>
                             </div>
 
                             <div className="booking-details">
-                                <p>📅 {new Date(booking.booking_date).toLocaleDateString('es-ES')}</p>
-                                <p>🕐 {formatTime(booking.start_time)} - {formatTime(booking.end_time)}</p>
-                                {booking.notes && <p className="notes">💬 {booking.notes}</p>}
+                                <p><strong>📅</strong> {new Date(booking.booking_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                                <p><strong>🕐</strong> {formatTime(booking.start_time)} - {formatTime(booking.end_time)}</p>
+                                {booking.notes && <p className="notes"><strong>💬</strong> {booking.notes}</p>}
                             </div>
 
                             <div className="booking-footer">
                                 <div className="status-badge" style={{ backgroundColor: statusColors[booking.status] }}>
-                                    {booking.status}
+                                    {booking.status.toUpperCase()}
                                 </div>
 
                                 <div className="booking-actions">
                                     {booking.status === 'pendiente' && (
-                                        <button onClick={() => updateStatus(booking.id, 'confirmada')} className="btn btn-sm btn-success">
-                                            Confirmar
+                                        <button
+                                            onClick={() => updateStatus(booking.id, 'confirmada')}
+                                            className="action-btn btn-confirm"
+                                            title="Confirmar reserva"
+                                        >
+                                            ✅ Confirmar
                                         </button>
                                     )}
                                     {(booking.status === 'pendiente' || booking.status === 'confirmada') && (
-                                        <button onClick={() => updateStatus(booking.id, 'completada')} className="btn btn-sm">
-                                            Completar
+                                        <button
+                                            onClick={() => updateStatus(booking.id, 'completada')}
+                                            className="action-btn btn-complete"
+                                            title="Marcar como completada"
+                                        >
+                                            ✔️ Completar
                                         </button>
                                     )}
-                                    <button onClick={() => updateStatus(booking.id, 'cancelada')} className="btn btn-sm btn-warning">
-                                        Cancelar
+                                    <button
+                                        onClick={() => updateStatus(booking.id, 'cancelada')}
+                                        className="action-btn btn-cancel"
+                                        title="Cancelar reserva"
+                                    >
+                                        ❌ Cancelar
                                     </button>
-                                    <button onClick={() => deleteBooking(booking.id)} className="btn btn-sm btn-danger">
-                                        Eliminar
+                                    <button
+                                        onClick={() => deleteBooking(booking.id, cliente?.nombre || 'este cliente')}
+                                        className="action-btn btn-delete"
+                                        title="Eliminar reserva permanentemente"
+                                    >
+                                        🗑️ Eliminar
                                     </button>
                                 </div>
                             </div>
@@ -226,13 +249,19 @@ export function BookingsPage() {
             </div>
 
             {filteredBookings.length === 0 && (
-                <p className="empty-state">No hay reservas {filter !== 'all' ? filter + 's' : ''}</p>
+                <div className="empty-state">
+                    <p className="empty-icon">📭</p>
+                    <p className="empty-text">No hay reservas {filter !== 'all' ? filter + 's' : ''}</p>
+                    <button onClick={() => setShowModal(true)} className="btn btn-primary">
+                        ➕ Crear Primera Reserva
+                    </button>
+                </div>
             )}
 
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <h2>Nueva Reserva</h2>
+                        <h2>📋 Nueva Reserva</h2>
 
                         <form onSubmit={handleSubmit}>
                             <div className="form-group">
@@ -306,11 +335,11 @@ export function BookingsPage() {
                             </div>
 
                             <div className="modal-actions">
-                                <button type="button" onClick={() => setShowModal(false)} className="btn">
+                                <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary">
                                     Cancelar
                                 </button>
                                 <button type="submit" className="btn btn-primary">
-                                    Crear Reserva
+                                    ✅ Crear Reserva
                                 </button>
                             </div>
                         </form>
@@ -319,7 +348,365 @@ export function BookingsPage() {
             )}
 
             <style jsx>{`
-        /* Similar styles as ClientsPage */
+        .bookings-page {
+          padding: 2rem;
+          max-width: 1400px;
+          margin: 0 auto;
+        }
+
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 2rem;
+        }
+
+        .page-header h1 {
+          margin: 0;
+          font-size: 2rem;
+        }
+
+        .filters {
+          display: flex;
+          gap: 1rem;
+          margin-bottom: 2rem;
+          flex-wrap: wrap;
+        }
+
+        .filter-btn {
+          padding: 0.75rem 1.5rem;
+          border: 2px solid #ddd;
+          border-radius: 12px;
+          background: white;
+          cursor: pointer;
+          font-size: 1rem;
+          font-weight: 500;
+          transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+          border-color: #007bff;
+          background: #f0f8ff;
+        }
+
+        .filter-btn.active {
+          background: #007bff;
+          color: white;
+          border-color: #007bff;
+        }
+
+        .bookings-list {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+          gap: 1.5rem;
+        }
+
+        .booking-card {
+          background: white;
+          border: 2px solid #e0e0e0;
+          border-radius: 16px;
+          padding: 1.5rem;
+          transition: all 0.3s;
+        }
+
+        .booking-card:hover {
+          box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+          transform: translateY(-2px);
+        }
+
+        .booking-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 1rem;
+          padding-bottom: 1rem;
+          border-bottom: 2px solid #f0f0f0;
+        }
+
+        .booking-info h3 {
+          margin: 0 0 0.5rem 0;
+          font-size: 1.4rem;
+          color: #333;
+        }
+
+        .service-name {
+          margin: 0;
+          color: #666;
+          font-size: 1.1rem;
+        }
+
+        .btn-whatsapp {
+          background: #25D366;
+          border: none;
+          padding: 0.75rem 1.25rem;
+          border-radius: 12px;
+          cursor: pointer;
+          font-size: 1.1rem;
+          font-weight: 600;
+          color: white;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .btn-whatsapp:hover {
+          background: #20ba5a;
+          transform: scale(1.05);
+        }
+
+        .whatsapp-icon {
+          font-size: 1.5rem;
+        }
+
+        .booking-details {
+          margin: 1rem 0;
+        }
+
+        .booking-details p {
+          margin: 0.75rem 0;
+          font-size: 1.05rem;
+          color: #555;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .booking-details strong {
+          font-size: 1.2rem;
+        }
+
+        .notes {
+          background: #f8f9fa;
+          padding: 0.75rem;
+          border-radius: 8px;
+          font-style: italic;
+          color: #666;
+        }
+
+        .booking-footer {
+          margin-top: 1.5rem;
+          padding-top: 1rem;
+          border-top: 2px solid #f0f0f0;
+        }
+
+        .status-badge {
+          display: inline-block;
+          padding: 0.5rem 1rem;
+          border-radius: 20px;
+          color: white;
+          font-weight: 700;
+          font-size: 0.9rem;
+          margin-bottom: 1rem;
+          letter-spacing: 0.5px;
+        }
+
+        .booking-actions {
+          display: flex;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+        }
+
+        .action-btn {
+          padding: 0.75rem 1.25rem;
+          border: 2px solid;
+          border-radius: 10px;
+          cursor: pointer;
+          font-size: 1rem;
+          font-weight: 600;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .action-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .btn-confirm {
+          background: #28a745;
+          color: white;
+          border-color: #28a745;
+        }
+
+        .btn-confirm:hover {
+          background: #218838;
+        }
+
+        .btn-complete {
+          background: #17a2b8;
+          color: white;
+          border-color: #17a2b8;
+        }
+
+        .btn-complete:hover {
+          background: #138496;
+        }
+
+        .btn-cancel {
+          background: #ffc107;
+          color: #333;
+          border-color: #ffc107;
+        }
+
+        .btn-cancel:hover {
+          background: #e0a800;
+        }
+
+        .btn-delete {
+          background: #dc3545;
+          color: white;
+          border-color: #dc3545;
+        }
+
+        .btn-delete:hover {
+          background: #c82333;
+        }
+
+        .empty-state {
+          text-align: center;
+          padding: 4rem 2rem;
+          background: #f8f9fa;
+          border-radius: 16px;
+          border: 2px dashed #ddd;
+        }
+
+        .empty-icon {
+          font-size: 4rem;
+          margin-bottom: 1rem;
+        }
+
+        .empty-text {
+          font-size: 1.2rem;
+          color: #666;
+          margin-bottom: 2rem;
+        }
+
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+
+        .modal-content {
+          background: white;
+          padding: 2.5rem;
+          border-radius: 20px;
+          max-width: 600px;
+          width: 90%;
+          max-height: 90vh;
+          overflow-y: auto;
+        }
+
+        .modal-content h2 {
+          margin-top: 0;
+          font-size: 1.8rem;
+        }
+
+        .form-group {
+          margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+          display: block;
+          margin-bottom: 0.5rem;
+          font-weight: 600;
+          font-size: 1.05rem;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+          width: 100%;
+          padding: 0.875rem;
+          border: 2px solid #ddd;
+          border-radius: 10px;
+          font-size: 1rem;
+          transition: border-color 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+          outline: none;
+          border-color: #007bff;
+        }
+
+        .form-row {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+          gap: 1rem;
+        }
+
+        .modal-actions {
+          display: flex;
+          gap: 1rem;
+          justify-content: flex-end;
+          margin-top: 2rem;
+        }
+
+        .btn {
+          padding: 0.875rem 1.75rem;
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          font-size: 1.05rem;
+          font-weight: 600;
+          transition: all 0.2s;
+        }
+
+        .btn-primary {
+          background: #007bff;
+          color: white;
+        }
+
+        .btn-primary:hover {
+          background: #0056b3;
+          transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+          background: #6c757d;
+          color: white;
+        }
+
+        .btn-secondary:hover {
+          background: #545b62;
+        }
+
+        .loading {
+          text-align: center;
+          padding: 3rem;
+          font-size: 1.2rem;
+        }
+
+        @media (max-width: 768px) {
+          .bookings-list {
+            grid-template-columns: 1fr;
+          }
+
+          .booking-actions {
+            flex-direction: column;
+          }
+
+          .action-btn {
+            width: 100%;
+            justify-content: center;
+          }
+
+          .whatsapp-text {
+            display: none;
+          }
+        }
       `}</style>
         </div>
     )
