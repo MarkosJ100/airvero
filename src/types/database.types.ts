@@ -1,24 +1,9 @@
-/**
- * AIRVERO - Tipos de Base de Datos
- * 
- * Generado para el esquema de Supabase.
- * Para regenerar automáticamente:
- * npx supabase gen types typescript --project-id <project-id> > src/types/database.types.ts
- */
+// Database type definitions for AIRVERO v2.0
 
-export type Json =
-    | string
-    | number
-    | boolean
-    | null
-    | { [key: string]: Json | undefined }
-    | Json[]
-
-// Enums
 export type UserRole = 'admin' | 'cliente'
+
 export type BookingStatus = 'pendiente' | 'confirmada' | 'cancelada' | 'completada'
 
-// Tipos de tablas
 export interface Profile {
     id: string
     user_id: string
@@ -57,27 +42,50 @@ export interface Service {
 
 export interface Schedule {
     id: string
-    day_of_week: number
-    start_time: string
-    end_time: string
+    day_of_week: number // 0=Domingo, 1=Lunes, ..., 6=Sábado
+    start_time: string // TIME format
+    end_time: string // TIME format
     is_active: boolean
     created_at: string
     updated_at: string
 }
 
-export interface Booking {
+// =============================================
+// v2.0: NUEVA TABLA - Contactos internos
+// =============================================
+
+export interface Cliente {
     id: string
-    client_id: string
-    service_id: string
-    booking_date: string
-    start_time: string
-    end_time: string
-    status: BookingStatus
-    notes: string | null
-    gcal_event_id: string | null
+    nombre: string
+    telefono: string
+    notas: string | null
     created_at: string
     updated_at: string
 }
+
+// =============================================
+// v2.0: ACTUALIZACIÓN - Bookings con cliente_id
+// =============================================
+
+export interface Booking {
+    id: string
+    client_id: string | null // DEPRECATED: v1.0 - FK a profiles (mantener temporalmente)
+    cliente_id: string | null // v2.0 - FK a clientes
+    service_id: string
+    booking_date: string // DATE format
+    start_time: string // TIME format
+    end_time: string // TIME format
+    status: BookingStatus
+    notes: string | null
+    gcal_event_id: string | null // Referencia Google Calendar (no sync activo)
+    client_id_backup: string | null // Backup para rollback seguro
+    created_at: string
+    updated_at: string
+}
+
+// =============================================
+// Google Calendar (mantenido para referencia)
+// =============================================
 
 export interface GoogleCalendarToken {
     id: string
@@ -89,69 +97,16 @@ export interface GoogleCalendarToken {
     updated_at: string
 }
 
-// Tipos para inserciones (sin campos auto-generados)
-export type ProfileInsert = Omit<Profile, 'id' | 'created_at' | 'updated_at'>
-export type SalonConfigInsert = Omit<SalonConfig, 'id' | 'created_at' | 'updated_at'>
-export type ServiceInsert = Omit<Service, 'id' | 'created_at' | 'updated_at'>
-export type ScheduleInsert = Omit<Schedule, 'id' | 'created_at' | 'updated_at'>
-export type BookingInsert = Omit<Booking, 'id' | 'created_at' | 'updated_at'>
-export type GoogleCalendarTokenInsert = Omit<GoogleCalendarToken, 'id' | 'created_at' | 'updated_at'>
+// =============================================
+// Tipos con relaciones (para queries con JOIN)
+// =============================================
 
-// Tipos para actualizaciones (todos los campos opcionales)
-export type ProfileUpdate = Partial<ProfileInsert>
-export type SalonConfigUpdate = Partial<SalonConfigInsert>
-export type ServiceUpdate = Partial<ServiceInsert>
-export type ScheduleUpdate = Partial<ScheduleInsert>
-export type BookingUpdate = Partial<BookingInsert>
-export type GoogleCalendarTokenUpdate = Partial<GoogleCalendarTokenInsert>
+export interface BookingWithRelations extends Booking {
+    cliente?: Cliente
+    service?: Service
+    profile?: Profile // v1.0 - deprecated
+}
 
-// Definición completa de la base de datos para Supabase
-export interface Database {
-    public: {
-        Tables: {
-            profiles: {
-                Row: Profile
-                Insert: ProfileInsert
-                Update: ProfileUpdate
-            }
-            salon_config: {
-                Row: SalonConfig
-                Insert: SalonConfigInsert
-                Update: SalonConfigUpdate
-            }
-            services: {
-                Row: Service
-                Insert: ServiceInsert
-                Update: ServiceUpdate
-            }
-            schedules: {
-                Row: Schedule
-                Insert: ScheduleInsert
-                Update: ScheduleUpdate
-            }
-            bookings: {
-                Row: Booking
-                Insert: BookingInsert
-                Update: BookingUpdate
-            }
-            google_calendar_tokens: {
-                Row: GoogleCalendarToken
-                Insert: GoogleCalendarTokenInsert
-                Update: GoogleCalendarTokenUpdate
-            }
-        }
-        Views: {
-            [_ in never]: never
-        }
-        Functions: {
-            is_admin: {
-                Args: Record<string, never>
-                Returns: boolean
-            }
-        }
-        Enums: {
-            user_role: UserRole
-            booking_status: BookingStatus
-        }
-    }
+export interface ClienteWithBookings extends Cliente {
+    bookings?: Booking[]
 }
