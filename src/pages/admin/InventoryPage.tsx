@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/context/ToastContext'
@@ -142,11 +143,14 @@ export function InventoryPage() {
                 .eq('id', id)
 
             if (error) throw error
+
+            // Optimistic update
+            setProductos(prev => prev.map(p => p.id === id ? { ...p, stock_actual: nuevoStock } : p))
             toast.success('Stock actualizado')
-            fetchProductos()
         } catch (error: any) {
             console.error('Error updating stock:', error)
             toast.error('Error al actualizar stock')
+            fetchProductos() // Revert on error
         }
     }
 
@@ -209,28 +213,24 @@ export function InventoryPage() {
     )
 
     return (
-        <div>
+        <div style={{ paddingBottom: '5rem' }}>
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <h2 style={{ fontSize: '1.8rem' }}>📦 Inventario de Productos</h2>
-                <Button
-                    onClick={() => {
-                        resetForm()
-                        setShowModal(true)
-                    }}
-                    variant="primary"
-                >
-                    ➕ Nuevo Producto
-                </Button>
+            <div className="page-header">
+                <h2 style={{ fontSize: '1.8rem', margin: 0 }}>📦 Inventario</h2>
+                <div className="desktop-only">
+                    <Button onClick={() => { resetForm(); setShowModal(true); }} variant="primary">
+                        ➕ Nuevo Producto
+                    </Button>
+                </div>
             </div>
 
-            {/* Estadísticas */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '1rem',
-                marginBottom: '2rem'
-            }}>
+            {/* Mobile FAB */}
+            <button onClick={() => { resetForm(); setShowModal(true); }} className="fab">
+                ➕
+            </button>
+
+            {/* Estadísticas Responsive */}
+            <div className="grid-responsive" style={{ marginBottom: '2rem' }}>
                 <Card>
                     <div style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>Total Productos</div>
                     <div style={{ fontSize: '2rem', fontWeight: 700, marginTop: '0.5rem' }}>{totalProductos}</div>
@@ -249,386 +249,147 @@ export function InventoryPage() {
                 </Card>
             </div>
 
-            {/* Búsqueda y Filtros */}
-            <Card style={{ marginBottom: '1.5rem' }}>
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            {/* Filtros */}
+            <Card style={{ marginBottom: '1.5rem', padding: '1rem' }}>
+                <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
                     <input
                         type="text"
-                        placeholder="🔍 Buscar producto..."
+                        placeholder="🔍 Buscar..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{
-                            flex: 1,
-                            minWidth: '200px',
-                            padding: '0.75rem',
-                            border: '2px solid var(--color-border)',
-                            borderRadius: '10px',
-                            fontSize: '1rem'
-                        }}
+                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}
                     />
                     <select
                         value={filterCategoria}
                         onChange={(e) => setFilterCategoria(e.target.value)}
-                        style={{
-                            padding: '0.75rem',
-                            border: '2px solid var(--color-border)',
-                            borderRadius: '10px',
-                            fontSize: '1rem'
-                        }}
+                        style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}
                     >
                         <option value="all">Todas las categorías</option>
-                        {CATEGORIAS.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                        ))}
+                        {CATEGORIAS.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                        <input
-                            type="checkbox"
-                            checked={showStockBajo}
-                            onChange={(e) => setShowStockBajo(e.target.checked)}
-                        />
-                        Solo stock bajo
+                </div>
+                <div style={{ marginTop: '1rem' }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={showStockBajo} onChange={(e) => setShowStockBajo(e.target.checked)} />
+                        Mostrar solo stock bajo ⚠️
                     </label>
                 </div>
             </Card>
 
-            {/* Tabla de Productos */}
-            <Card>
-                {loading ? (
-                    <div>
-                        <div style={{ marginBottom: '1rem' }}>
-                            <Skeleton height="3rem" />
-                        </div>
-                        <div style={{ marginBottom: '1rem' }}>
-                            <Skeleton height="3rem" />
-                        </div>
-                        <Skeleton height="3rem" />
-                    </div>
-                ) : productosFiltrados.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)' }}>
-                        No se encontraron productos
-                    </div>
-                ) : (
-                    <div style={{ overflowX: 'auto' }}>
+            {loading ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando inventario...</div>
+            ) : productosFiltrados.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)' }}>No se encontraron productos</div>
+            ) : (
+                <>
+                    {/* DESKTOP VIEW: Table */}
+                    <Card className="desktop-only" padding="0">
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
+                            <thead style={{ background: 'var(--color-bg-secondary)' }}>
+                                <tr>
                                     <th style={{ padding: '1rem', textAlign: 'left' }}>Producto</th>
                                     <th style={{ padding: '1rem', textAlign: 'left' }}>Categoría</th>
                                     <th style={{ padding: '1rem', textAlign: 'center' }}>Stock</th>
-                                    <th style={{ padding: '1rem', textAlign: 'right' }}>P. Compra</th>
                                     <th style={{ padding: '1rem', textAlign: 'right' }}>P. Venta</th>
                                     <th style={{ padding: '1rem', textAlign: 'center' }}>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {productosFiltrados.map(producto => (
-                                    <tr key={producto.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                {productosFiltrados.map(p => (
+                                    <tr key={p.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                                         <td style={{ padding: '1rem' }}>
-                                            <div style={{ fontWeight: 600 }}>{producto.nombre}</div>
-                                            {producto.marca && (
-                                                <div style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
-                                                    {producto.marca}
-                                                </div>
-                                            )}
+                                            <div style={{ fontWeight: 600 }}>{p.nombre}</div>
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>{p.marca}</div>
                                         </td>
-                                        <td style={{ padding: '1rem' }}>{producto.categoria}</td>
+                                        <td style={{ padding: '1rem' }}>{p.categoria}</td>
                                         <td style={{ padding: '1rem', textAlign: 'center' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
-                                                <button
-                                                    onClick={() => ajustarStock(producto.id, -1)}
-                                                    style={{
-                                                        background: 'var(--color-bg-secondary)',
-                                                        border: 'none',
-                                                        borderRadius: '5px',
-                                                        padding: '0.25rem 0.5rem',
-                                                        cursor: 'pointer',
-                                                        fontSize: '1rem'
-                                                    }}
-                                                >
-                                                    −
-                                                </button>
-                                                <span style={{
-                                                    fontWeight: 600,
-                                                    color: producto.stock_actual <= producto.stock_minimo ? 'var(--color-error)' : 'inherit',
-                                                    minWidth: '3rem',
-                                                    textAlign: 'center'
-                                                }}>
-                                                    {producto.stock_actual} {producto.unidad_medida}
-                                                    {producto.stock_actual <= producto.stock_minimo && ' ⚠️'}
+                                                <button onClick={() => ajustarStock(p.id, -1)} style={{ padding: '0.25rem 0.5rem', cursor: 'pointer' }}>-</button>
+                                                <span style={{ fontWeight: 600, color: p.stock_actual <= p.stock_minimo ? 'red' : 'inherit' }}>
+                                                    {p.stock_actual}
                                                 </span>
-                                                <button
-                                                    onClick={() => ajustarStock(producto.id, 1)}
-                                                    style={{
-                                                        background: 'var(--color-success)',
-                                                        color: 'white',
-                                                        border: 'none',
-                                                        borderRadius: '5px',
-                                                        padding: '0.25rem 0.5rem',
-                                                        cursor: 'pointer',
-                                                        fontSize: '1rem'
-                                                    }}
-                                                >
-                                                    +
-                                                </button>
+                                                <button onClick={() => ajustarStock(p.id, 1)} style={{ padding: '0.25rem 0.5rem', cursor: 'pointer' }}>+</button>
                                             </div>
                                         </td>
                                         <td style={{ padding: '1rem', textAlign: 'right' }}>
-                                            {producto.precio_compra ? `€${producto.precio_compra.toFixed(2)}` : '-'}
-                                        </td>
-                                        <td style={{ padding: '1rem', textAlign: 'right' }}>
-                                            {producto.precio_venta ? `€${producto.precio_venta.toFixed(2)}` : '-'}
+                                            {p.precio_venta ? `€${p.precio_venta}` : '-'}
                                         </td>
                                         <td style={{ padding: '1rem', textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                                <button
-                                                    onClick={() => openEditModal(producto)}
-                                                    style={{
-                                                        background: 'none',
-                                                        border: 'none',
-                                                        cursor: 'pointer',
-                                                        fontSize: '1.2rem'
-                                                    }}
-                                                    title="Editar"
-                                                >
-                                                    ✏️
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(producto.id)}
-                                                    style={{
-                                                        background: 'none',
-                                                        border: 'none',
-                                                        cursor: 'pointer',
-                                                        fontSize: '1.2rem'
-                                                    }}
-                                                    title="Eliminar"
-                                                >
-                                                    🗑️
-                                                </button>
-                                            </div>
+                                            <button onClick={() => openEditModal(p)} style={{ marginRight: '0.5rem', cursor: 'pointer', background: 'none', border: 'none' }}>✏️</button>
+                                            <button onClick={() => handleDelete(p.id)} style={{ cursor: 'pointer', background: 'none', border: 'none' }}>🗑️</button>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                    </Card>
+
+                    {/* MOBILE VIEW: Cards */}
+                    <div className="mobile-only grid-responsive">
+                        {productosFiltrados.map(p => (
+                            <div key={p.id} className="card-mobile">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{p.nombre}</h3>
+                                    <span style={{ fontSize: '0.85rem', background: 'var(--color-bg-secondary)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
+                                        {p.categoria}
+                                    </span>
+                                </div>
+                                <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+                                    {p.marca}
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-bg-secondary)', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem' }}>
+                                    <div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>Stock Actual</div>
+                                        <div style={{ fontWeight: 700, fontSize: '1.2rem', color: p.stock_actual <= p.stock_minimo ? 'red' : 'inherit' }}>
+                                            {p.stock_actual} {p.unidad_medida}
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <button onClick={() => ajustarStock(p.id, -1)} style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid #ddd', background: 'white' }}>-</button>
+                                        <button onClick={() => ajustarStock(p.id, 1)} style={{ width: '32px', height: '32px', borderRadius: '50%', border: 'none', background: 'var(--color-success)', color: 'white' }}>+</button>
+                                    </div>
+                                </div>
+
+                                <div className="actions-grid">
+                                    <button className="action-btn-icon" onClick={() => openEditModal(p)}>
+                                        <span>✏️</span> Editar
+                                    </button>
+                                    <button className="action-btn-icon" onClick={() => handleDelete(p.id)}>
+                                        <span>🗑️</span> Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                )}
-            </Card>
+                </>
+            )}
 
             {/* Modal */}
             {showModal && (
-                <div
-                    onClick={() => setShowModal(false)}
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: 'rgba(0,0,0,0.5)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 1000
-                    }}
-                >
-                    <div
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                            background: 'white',
-                            padding: '2rem',
-                            borderRadius: '20px',
-                            width: '90%',
-                            maxWidth: '600px',
-                            maxHeight: '90vh',
-                            overflow: 'auto'
-                        }}
-                    >
-                        <h3 style={{ marginTop: 0 }}>
-                            {editingProducto ? '✏️ Editar Producto' : '➕ Nuevo Producto'}
-                        </h3>
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowModal(false)}>
+                    <div style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ marginTop: 0 }}>{editingProducto ? '✏️ Editar' : '➕ Nuevo Producto'}</h3>
+                        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <input placeholder="Nombre *" value={formData.nombre} onChange={e => setFormData({ ...formData, nombre: e.target.value })} required className="input-field" style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }} />
 
-                        <form onSubmit={handleSubmit}>
-                            <div style={{ display: 'grid', gap: '1rem' }}>
-                                <div>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                                        Nombre *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.nombre}
-                                        onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.75rem',
-                                            border: '2px solid var(--color-border)',
-                                            borderRadius: '10px',
-                                            fontSize: '1rem'
-                                        }}
-                                    />
-                                </div>
+                            <select value={formData.categoria} onChange={e => setFormData({ ...formData, categoria: e.target.value })} style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }}>
+                                {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                    <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                                            Categoría *
-                                        </label>
-                                        <select
-                                            required
-                                            value={formData.categoria}
-                                            onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-                                            style={{
-                                                width: '100%',
-                                                padding: '0.75rem',
-                                                border: '2px solid var(--color-border)',
-                                                borderRadius: '10px',
-                                                fontSize: '1rem'
-                                            }}
-                                        >
-                                            {CATEGORIAS.map(cat => (
-                                                <option key={cat} value={cat}>{cat}</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <input type="number" placeholder="Stock" value={formData.stock_actual} onChange={e => setFormData({ ...formData, stock_actual: e.target.value })} className="input-field" style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }} />
+                                <input type="number" placeholder="Minimo" value={formData.stock_minimo} onChange={e => setFormData({ ...formData, stock_minimo: e.target.value })} className="input-field" style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }} />
+                            </div>
 
-                                    <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                                            Marca
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.marca}
-                                            onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
-                                            style={{
-                                                width: '100%',
-                                                padding: '0.75rem',
-                                                border: '2px solid var(--color-border)',
-                                                borderRadius: '10px',
-                                                fontSize: '1rem'
-                                            }}
-                                        />
-                                    </div>
-                                </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <input type="number" placeholder="P. Venta" value={formData.precio_venta} onChange={e => setFormData({ ...formData, precio_venta: e.target.value })} className="input-field" style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }} />
+                                <input type="number" placeholder="P. Compra" value={formData.precio_compra} onChange={e => setFormData({ ...formData, precio_compra: e.target.value })} className="input-field" style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd' }} />
+                            </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                    <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                                            Precio Compra (€)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={formData.precio_compra}
-                                            onChange={(e) => setFormData({ ...formData, precio_compra: e.target.value })}
-                                            style={{
-                                                width: '100%',
-                                                padding: '0.75rem',
-                                                border: '2px solid var(--color-border)',
-                                                borderRadius: '10px',
-                                                fontSize: '1rem'
-                                            }}
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                                            Precio Venta (€)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={formData.precio_venta}
-                                            onChange={(e) => setFormData({ ...formData, precio_venta: e.target.value })}
-                                            style={{
-                                                width: '100%',
-                                                padding: '0.75rem',
-                                                border: '2px solid var(--color-border)',
-                                                borderRadius: '10px',
-                                                fontSize: '1rem'
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                                    <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                                            Stock Actual *
-                                        </label>
-                                        <input
-                                            type="number"
-                                            required
-                                            min="0"
-                                            value={formData.stock_actual}
-                                            onChange={(e) => setFormData({ ...formData, stock_actual: e.target.value })}
-                                            style={{
-                                                width: '100%',
-                                                padding: '0.75rem',
-                                                border: '2px solid var(--color-border)',
-                                                borderRadius: '10px',
-                                                fontSize: '1rem'
-                                            }}
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                                            Stock Mínimo *
-                                        </label>
-                                        <input
-                                            type="number"
-                                            required
-                                            min="0"
-                                            value={formData.stock_minimo}
-                                            onChange={(e) => setFormData({ ...formData, stock_minimo: e.target.value })}
-                                            style={{
-                                                width: '100%',
-                                                padding: '0.75rem',
-                                                border: '2px solid var(--color-border)',
-                                                borderRadius: '10px',
-                                                fontSize: '1rem'
-                                            }}
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
-                                            Unidad
-                                        </label>
-                                        <select
-                                            value={formData.unidad_medida}
-                                            onChange={(e) => setFormData({ ...formData, unidad_medida: e.target.value })}
-                                            style={{
-                                                width: '100%',
-                                                padding: '0.75rem',
-                                                border: '2px solid var(--color-border)',
-                                                borderRadius: '10px',
-                                                fontSize: '1rem'
-                                            }}
-                                        >
-                                            <option value="unidad">unidad</option>
-                                            <option value="ml">ml</option>
-                                            <option value="gr">gr</option>
-                                            <option value="l">litros</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                                    <Button
-                                        type="button"
-                                        onClick={() => setShowModal(false)}
-                                        variant="secondary"
-                                    >
-                                        Cancelar
-                                    </Button>
-                                    <Button type="submit" variant="primary">
-                                        {editingProducto ? 'Actualizar' : 'Crear'}
-                                    </Button>
-                                </div>
+                            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                                <button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, padding: '0.8rem', borderRadius: '8px', border: '1px solid #ddd', background: 'white' }}>Cancelar</button>
+                                <button type="submit" style={{ flex: 1, padding: '0.8rem', borderRadius: '8px', border: 'none', background: 'var(--color-primary)', color: 'white', fontWeight: 'bold' }}>Guardar</button>
                             </div>
                         </form>
                     </div>
