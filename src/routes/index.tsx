@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
+import { createHashRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { AuthLayout } from '@/components/layout/AuthLayout'
 import { ProtectedRoute } from './ProtectedRoute'
@@ -12,7 +12,7 @@ import { ServicesPage } from '@/pages/admin/ServicesPage'
 import { SchedulePage } from '@/pages/admin/SchedulePage'
 import { SettingsPage } from '@/pages/admin/SettingsPage'
 
-const router = createBrowserRouter([
+const router = createHashRouter([
     // Root redirect to admin
     {
         path: '/',
