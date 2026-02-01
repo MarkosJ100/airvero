@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { Card, Button, Loader } from '@/components/ui'
+import { Card, Button, StatCardSkeleton } from '@/components/ui'
 
 // Tipos locales para el dashboard
 interface DashboardStats {
@@ -109,8 +109,6 @@ export function DashboardPage() {
         return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
     }
 
-    if (loading) return <Loader />
-
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -130,33 +128,44 @@ export function DashboardPage() {
                 gap: '1.5rem',
                 marginBottom: '2rem'
             }}>
-                <Card>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Citas Hoy</div>
-                    <div style={{ fontSize: '2rem', fontWeight: 700, marginTop: '0.5rem' }}>
-                        {stats.todayBookings}
-                    </div>
-                </Card>
+                {loading ? (
+                    <>
+                        <StatCardSkeleton />
+                        <StatCardSkeleton />
+                        <StatCardSkeleton />
+                        <StatCardSkeleton />
+                    </>
+                ) : (
+                    <>
+                        <Card>
+                            <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Citas Hoy</div>
+                            <div style={{ fontSize: '2rem', fontWeight: 700, marginTop: '0.5rem' }}>
+                                {stats.todayBookings}
+                            </div>
+                        </Card>
 
-                <Card>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Pendientes</div>
-                    <div style={{ fontSize: '2rem', fontWeight: 700, marginTop: '0.5rem', color: 'var(--color-warning)' }}>
-                        {stats.pendingBookings}
-                    </div>
-                </Card>
+                        <Card>
+                            <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Pendientes</div>
+                            <div style={{ fontSize: '2rem', fontWeight: 700, marginTop: '0.5rem', color: 'var(--color-warning)' }}>
+                                {stats.pendingBookings}
+                            </div>
+                        </Card>
 
-                <Card>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Confirmadas</div>
-                    <div style={{ fontSize: '2rem', fontWeight: 700, marginTop: '0.5rem', color: 'var(--color-success)' }}>
-                        {stats.confirmedBookings}
-                    </div>
-                </Card>
+                        <Card>
+                            <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Confirmadas</div>
+                            <div style={{ fontSize: '2rem', fontWeight: 700, marginTop: '0.5rem', color: 'var(--color-success)' }}>
+                                {stats.confirmedBookings}
+                            </div>
+                        </Card>
 
-                <Card>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Total Clientes</div>
-                    <div style={{ fontSize: '2rem', fontWeight: 700, marginTop: '0.5rem' }}>
-                        {stats.totalClientes}
-                    </div>
-                </Card>
+                        <Card>
+                            <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Total Clientes</div>
+                            <div style={{ fontSize: '2rem', fontWeight: 700, marginTop: '0.5rem' }}>
+                                {stats.totalClientes}
+                            </div>
+                        </Card>
+                    </>
+                )}
             </div>
 
             {/* Próximas Citas */}

@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Booking, Cliente, Service, BookingWithRelations } from '@/types/database.types'
 import { generateWhatsAppLink, formatConfirmationMessage, formatDateSpanish, formatTime } from '@/lib/whatsapp'
+import { useToast } from '@/context/ToastContext'
+import { calcularProximoSlotDisponible, calcularHoraFin, validarConflictoReservas } from '@/utils/bookingHelpers'
 
 export function BookingsPage() {
+  const toast = useToast()
   const [bookings, setBookings] = useState<BookingWithRelations[]>([])
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -20,6 +23,7 @@ export function BookingsPage() {
     status: 'pendiente' as Booking['status'],
     notes: ''
   })
+  const [horaSugerida, setHoraSugerida] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -49,13 +53,71 @@ export function BookingsPage() {
       setServices(servicesRes.data || [])
     } catch (error) {
       console.error('Error fetching data:', error)
+      toast.error('Error al cargar datos')
     } finally {
       setLoading(false)
     }
   }
 
+  // Auto-sugerencia de hora cuando cambia servicio o fecha
+  useEffect(() => {
+    if (formData.service_id && formData.booking_date) {
+      const service = services.find(s => s.id === formData.service_id)
+      if (service) {
+        const horaSugerida = calcularProximoSlotDisponible(
+          formData.booking_date,
+          service.duration_minutes,
+          bookings,
+          '09:00',
+          '20:00'
+        )
+
+        if (horaSugerida) {
+          const horaFin = calcularHoraFin(horaSugerida, service.duration_minutes)
+          setFormData(prev => ({
+            ...prev,
+            start_time: horaSugerida,
+            end_time: horaFin
+          }))
+          setHoraSugerida(true)
+        }
+      }
+    }
+  }, [formData.service_id, formData.booking_date, services, bookings])
+
+  // Actualizar hora fin cuando cambia hora inicio manualmente
+  function handleStartTimeChange(newStartTime: string) {
+    const service = services.find(s => s.id === formData.service_id)
+    if (service && newStartTime) {
+      const newEndTime = calcularHoraFin(newStartTime, service.duration_minutes)
+      setFormData(prev => ({ ...prev, start_time: newStartTime, end_time: newEndTime }))
+      setHoraSugerida(false)
+    } else {
+      setFormData(prev => ({ ...prev, start_time: newStartTime }))
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+
+    // Validar conflictos antes de guardar
+    const service = services.find(s => s.id === formData.service_id)
+    if (service) {
+      const { hayConflicto, reservaConflicto } = validarConflictoReservas(
+        formData.booking_date,
+        formData.start_time,
+        service.duration_minutes,
+        bookings
+      )
+
+      if (hayConflicto && reservaConflicto) {
+        const clienteConflicto = bookings.find(b => b.id === reservaConflicto.id)?.clientes as Cliente | undefined
+        toast.error(
+          `Conflicto: Ya existe una reserva de ${clienteConflicto?.nombre || 'un cliente'} a las ${formatTime(reservaConflicto.start_time)}`
+        )
+        return
+      }
+    }
 
     try {
       const { error } = await supabase
@@ -81,11 +143,16 @@ export function BookingsPage() {
         status: 'pendiente',
         notes: ''
       })
+      setHoraSugerida(false)
       setShowModal(false)
+      toast.success('Reserva creada correctamente')
       fetchData()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating booking:', error)
-      alert('Error al crear reserva')
+      console.error('Error message:', error?.message)
+      console.error('Error details:', error?.details)
+      console.error('Error hint:', error?.hint)
+      toast.error(error?.message || 'Error al crear reserva')
     }
   }
 
@@ -97,9 +164,11 @@ export function BookingsPage() {
         .eq('id', id)
 
       if (error) throw error
+      toast.success('Estado actualizado')
       fetchData()
     } catch (error) {
       console.error('Error updating status:', error)
+      toast.error('Error al actualizar estado')
     }
   }
 
@@ -111,24 +180,22 @@ export function BookingsPage() {
     if (!confirmed) return
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('bookings')
         .delete()
         .eq('id', id)
 
       if (error) {
-        console.error('Error de Supabase al eliminar reserva:', error)
-        console.error('Detalles del error:', JSON.stringify(error, null, 2))
-        alert(`❌ Error al eliminar la reserva: ${error.message}`)
+        console.error('Error al eliminar reserva:', error)
+        toast.error(`Error al eliminar la reserva: ${error.message}`)
         return
       }
 
-      console.log('Reserva eliminada correctamente:', data)
-      alert('✅ Reserva eliminada correctamente')
+      toast.success('Reserva eliminada correctamente')
       fetchData()
     } catch (error) {
       console.error('Error inesperado eliminando reserva:', error)
-      alert('❌ Error inesperado al eliminar la reserva')
+      toast.error('Error inesperado al eliminar la reserva')
     }
   }
 
@@ -311,12 +378,12 @@ export function BookingsPage() {
                 </div>
 
                 <div className="form-group">
-                  <label>Hora inicio *</label>
+                  <label>Hora inicio * {horaSugerida && <span style={{ color: 'var(--color-success)', fontSize: '0.875rem', marginLeft: '0.5rem' }}>✨ Sugerido</span>}</label>
                   <input
                     type="time"
                     required
                     value={formData.start_time}
-                    onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                    onChange={(e) => handleStartTimeChange(e.target.value)}
                   />
                 </div>
 
@@ -326,7 +393,9 @@ export function BookingsPage() {
                     type="time"
                     required
                     value={formData.end_time}
-                    onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                    readOnly
+                    style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                    title="Se calcula automáticamente según la duración del servicio"
                   />
                 </div>
               </div>

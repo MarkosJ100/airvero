@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Cliente } from '@/types/database.types'
 import { generateWhatsAppLink, formatGenericMessage } from '@/lib/whatsapp'
+import { useToast } from '@/context/ToastContext'
 
 export function ClientsPage() {
+    const toast = useToast()
     const [clientes, setClientes] = useState<Cliente[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
@@ -31,6 +33,7 @@ export function ClientsPage() {
             setClientes(data || [])
         } catch (error) {
             console.error('Error fetching clientes:', error)
+            toast.error('Error al cargar clientes')
         } finally {
             setLoading(false)
         }
@@ -69,10 +72,11 @@ export function ClientsPage() {
             setFormData({ nombre: '', telefono: '', notas: '' })
             setShowModal(false)
             setEditingCliente(null)
+            toast.success(editingCliente ? 'Cliente actualizado' : 'Cliente creado')
             fetchClientes()
         } catch (error) {
             console.error('Error saving cliente:', error)
-            alert('Error al guardar cliente')
+            toast.error('Error al guardar cliente')
         }
     }
 
@@ -80,24 +84,22 @@ export function ClientsPage() {
         if (!confirm('¿Eliminar este contacto?')) return
 
         try {
-            const { data, error } = await supabase
+            const { error } = await supabase
                 .from('clientes')
                 .delete()
                 .eq('id', id)
 
             if (error) {
-                console.error('Error de Supabase al eliminar cliente:', error)
-                console.error('Detalles del error:', JSON.stringify(error, null, 2))
-                alert(`Error al eliminar cliente: ${error.message}`)
+                console.error('Error al eliminar cliente:', error)
+                toast.error(`Error al eliminar cliente: ${error.message}`)
                 return
             }
 
-            console.log('Cliente eliminado correctamente:', data)
-            alert('✅ Cliente eliminado correctamente')
+            toast.success('Cliente eliminado correctamente')
             fetchClientes()
         } catch (error) {
             console.error('Error inesperado eliminando cliente:', error)
-            alert('Error inesperado al eliminar cliente')
+            toast.error('Error inesperado al eliminar cliente')
         }
     }
 

@@ -7,6 +7,7 @@ import { DashboardPage } from '@/pages/admin/DashboardPage'
 import { CalendarPage } from '@/pages/admin/CalendarPage'
 import { BookingsPage } from '@/pages/admin/BookingsPage'
 import { ClientsPage } from '@/pages/admin/ClientsPage'
+import { InventoryPage } from '@/pages/admin/InventoryPage'
 import { ServicesPage } from '@/pages/admin/ServicesPage'
 import { SchedulePage } from '@/pages/admin/SchedulePage'
 import { SettingsPage } from '@/pages/admin/SettingsPage'
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
                     { path: 'calendar', element: <CalendarPage /> },
                     { path: 'bookings', element: <BookingsPage /> },
                     { path: 'clients', element: <ClientsPage /> },
+                    { path: 'inventory', element: <InventoryPage /> },
                     { path: 'services', element: <ServicesPage /> },
                     { path: 'schedule', element: <SchedulePage /> },
                     { path: 'settings', element: <SettingsPage /> },

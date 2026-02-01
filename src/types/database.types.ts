@@ -110,3 +110,28 @@ export interface BookingWithRelations extends Booking {
 export interface ClienteWithBookings extends Cliente {
     bookings?: Booking[]
 }
+
+// =============================================
+// Inventario de productos
+// =============================================
+
+export interface Producto {
+    id: string
+    nombre: string
+    categoria: string
+    marca: string | null
+    descripcion: string | null
+    codigo_barras: string | null
+    precio_compra: number | null
+    precio_venta: number | null
+    stock_actual: number
+    stock_minimo: number
+    stock_maximo: number | null
+    unidad_medida: string
+    ubicacion: string | null
+    proveedor: string | null
+    notas: string | null
+    is_active: boolean
+    created_at: string
+    updated_at: string
+}
