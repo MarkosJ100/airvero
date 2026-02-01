@@ -277,13 +277,24 @@ export function InventoryPage() {
             </Card>
 
             {loading ? (
-                <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando inventario...</div>
+                <div style={{ padding: '0 1rem' }}>
+                    <div className="desktop-only">
+                        <Skeleton height="3rem" className="mb-2" />
+                        <Skeleton height="3rem" className="mb-2" />
+                        <Skeleton height="3rem" />
+                    </div>
+                    <div className="mobile-only grid-responsive">
+                        <Skeleton height="150px" />
+                        <Skeleton height="150px" />
+                        <Skeleton height="150px" />
+                    </div>
+                </div>
             ) : productosFiltrados.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)' }}>No se encontraron productos</div>
             ) : (
                 <>
                     {/* DESKTOP VIEW: Table */}
-                    <Card className="desktop-only" padding="0">
+                    <Card className="desktop-only" noPadding>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead style={{ background: 'var(--color-bg-secondary)' }}>
                                 <tr>
