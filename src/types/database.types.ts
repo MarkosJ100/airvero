@@ -135,3 +135,49 @@ export interface Producto {
     created_at: string
     updated_at: string
 }
+
+// =============================================
+// Tipo Database para Supabase Client
+// =============================================
+
+export interface Database {
+    public: {
+        Tables: {
+            profiles: {
+                Row: Profile
+                Insert: Omit<Profile, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<Profile, 'id' | 'created_at' | 'updated_at'>>
+            }
+            clientes: {
+                Row: Cliente
+                Insert: Omit<Cliente, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<Cliente, 'id' | 'created_at' | 'updated_at'>>
+            }
+            bookings: {
+                Row: Booking
+                Insert: Omit<Booking, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<Booking, 'id' | 'created_at' | 'updated_at'>>
+            }
+            services: {
+                Row: Service
+                Insert: Omit<Service, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<Service, 'id' | 'created_at' | 'updated_at'>>
+            }
+            productos: {
+                Row: Producto
+                Insert: Omit<Producto, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<Producto, 'id' | 'created_at' | 'updated_at'>>
+            }
+            salon_config: {
+                Row: SalonConfig
+                Insert: Omit<SalonConfig, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<SalonConfig, 'id' | 'created_at' | 'updated_at'>>
+            }
+            schedules: {
+                Row: Schedule
+                Insert: Omit<Schedule, 'id' | 'created_at' | 'updated_at'>
+                Update: Partial<Omit<Schedule, 'id' | 'created_at' | 'updated_at'>>
+            }
+        }
+    }
+}

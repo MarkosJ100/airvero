@@ -111,7 +111,7 @@ export function BookingsPage() {
       )
 
       if (hayConflicto && reservaConflicto) {
-        const clienteConflicto = bookings.find(b => b.id === reservaConflicto.id)?.clientes as Cliente | undefined
+        const clienteConflicto = bookings.find(b => b.id === reservaConflicto.id)?.cliente as Cliente | undefined
         toast.error(
           `Conflicto: Ya existe una reserva de ${clienteConflicto?.nombre || 'un cliente'} a las ${formatTime(reservaConflicto.start_time)}`
         )
@@ -423,7 +423,7 @@ export function BookingsPage() {
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         .bookings-page {
           padding: 2rem;
           max-width: 1400px;

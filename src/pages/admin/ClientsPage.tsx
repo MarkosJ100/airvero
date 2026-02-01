@@ -242,7 +242,7 @@ export function ClientsPage() {
                 </div>
             )}
 
-            <style jsx>{`
+            <style>{`
         .clients-page {
           padding: 2rem;
         }
