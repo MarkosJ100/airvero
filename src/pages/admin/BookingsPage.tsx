@@ -24,6 +24,7 @@ export function BookingsPage() {
     status: 'pendiente' as Booking['status'],
     notes: ''
   })
+  const [editingBookingId, setEditingBookingId] = useState<string | null>(null)
   const [horaSugerida, setHoraSugerida] = useState(false)
 
   useEffect(() => {
@@ -110,20 +111,38 @@ export function BookingsPage() {
     }
 
     try {
-      const { error } = await supabase.from('bookings').insert({
-        cliente_id: formData.cliente_id,
-        service_id: formData.service_id,
-        booking_date: formData.booking_date,
-        start_time: formData.start_time,
-        end_time: formData.end_time,
-        status: formData.status,
-        notes: formData.notes || null
-      })
-      if (error) throw error
+      if (editingBookingId) {
+        // ACTUALIZAR
+        const { error } = await supabase.from('bookings').update({
+          cliente_id: formData.cliente_id,
+          service_id: formData.service_id,
+          booking_date: formData.booking_date,
+          start_time: formData.start_time,
+          end_time: formData.end_time,
+          status: formData.status,
+          notes: formData.notes || null
+        }).eq('id', editingBookingId)
+
+        if (error) throw error
+        toast.success('Reserva actualizada')
+      } else {
+        // INSERTAR
+        const { error } = await supabase.from('bookings').insert({
+          cliente_id: formData.cliente_id,
+          service_id: formData.service_id,
+          booking_date: formData.booking_date,
+          start_time: formData.start_time,
+          end_time: formData.end_time,
+          status: formData.status,
+          notes: formData.notes || null
+        })
+        if (error) throw error
+        toast.success('Reserva creada exitosamente')
+      }
 
       setFormData({ cliente_id: '', service_id: '', booking_date: '', start_time: '', end_time: '', status: 'pendiente', notes: '' })
+      setEditingBookingId(null)
       setShowModal(false)
-      toast.success('Reserva creada exitosamente')
       fetchData()
     } catch (error) {
       console.error(error)
@@ -140,6 +159,20 @@ export function BookingsPage() {
     } catch (error) {
       toast.error('Error actualizando estado')
     }
+  }
+
+  const prepareEdit = (booking: BookingWithRelations) => {
+    setFormData({
+      cliente_id: booking.cliente_id || '',
+      service_id: booking.service_id,
+      booking_date: booking.booking_date,
+      start_time: booking.start_time.substring(0, 5),
+      end_time: booking.end_time.substring(0, 5),
+      status: booking.status,
+      notes: booking.notes || ''
+    })
+    setEditingBookingId(booking.id)
+    setShowModal(true)
   }
 
   const deleteBooking = async (id: string, nombre: string) => {
@@ -280,6 +313,15 @@ export function BookingsPage() {
                     </button>
                   )}
 
+                  {/* Edit Button */}
+                  <button
+                    className="btn-action-primary"
+                    style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)' }}
+                    onClick={() => prepareEdit(booking)}
+                  >
+                    ✏️ Editar
+                  </button>
+
                   {/* WhatsApp Button (Always visible) */}
                   <button
                     className="btn-action-whatsapp"
@@ -309,7 +351,11 @@ export function BookingsPage() {
       {/* Premium FAB */}
       <button
         className={`fab-premium ${showModal ? 'open' : ''}`}
-        onClick={() => setShowModal(true)}
+        onClick={() => {
+          setEditingBookingId(null)
+          setFormData({ cliente_id: '', service_id: '', booking_date: '', start_time: '', end_time: '', status: 'pendiente', notes: '' })
+          setShowModal(true)
+        }}
         aria-label="Nueva Reserva"
       >
         <span className="plus-icon">➕</span>
@@ -320,8 +366,11 @@ export function BookingsPage() {
         <div className="modal-premium-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-premium" onClick={e => e.stopPropagation()}>
             <div className="modal-premium-header">
-              <h2>✨ Nueva Reserva</h2>
-              <button className="modal-close-btn" onClick={() => setShowModal(false)}>×</button>
+              <h2>{editingBookingId ? '✏️ Editar Reserva' : '✨ Nueva Reserva'}</h2>
+              <button className="modal-close-btn" onClick={() => {
+                setShowModal(false)
+                setEditingBookingId(null)
+              }}>×</button>
             </div>
 
             <form onSubmit={handleSubmit}>
@@ -361,11 +410,14 @@ export function BookingsPage() {
               </div>
 
               <div className="modal-premium-footer">
-                <button type="button" className="modal-btn-cancel" onClick={() => setShowModal(false)}>
+                <button type="button" className="modal-btn-cancel" onClick={() => {
+                  setShowModal(false)
+                  setEditingBookingId(null)
+                }}>
                   Cancelar
                 </button>
                 <button type="submit" className="modal-btn-submit">
-                  Confirmar Reserva
+                  {editingBookingId ? 'Guardar Cambios' : 'Confirmar Reserva'}
                 </button>
               </div>
             </form>

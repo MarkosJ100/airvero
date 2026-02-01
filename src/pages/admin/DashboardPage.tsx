@@ -27,11 +27,19 @@ export function DashboardPage() {
         totalClientes: 0
     })
     const [nextBookings, setNextBookings] = useState<NextBooking[]>([])
+    const [alerts, setAlerts] = useState<NextBooking[]>([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         loadData()
-    }, [])
+        
+        // Timer para actualizar alertas cada minuto
+        const timer = setInterval(() => {
+            updateAlerts(nextBookings)
+        }, 60000)
+
+        return () => clearInterval(timer)
+    }, [nextBookings])
 
     const loadData = async () => {
         try {
@@ -89,11 +97,33 @@ export function DashboardPage() {
             })) : []
 
             setNextBookings(mappedBookings)
+            updateAlerts(mappedBookings)
         } catch (error) {
             console.error('Error fetching dashboard data:', error)
         } finally {
             setLoading(false)
         }
+    }
+
+    const updateAlerts = (bookings: NextBooking[]) => {
+        const now = new Date()
+        const today = now.toISOString().split('T')[0]
+        
+        const urgentAlerts = bookings.filter(booking => {
+            // Solo para citas de hoy que estén pendientes
+            if (booking.booking_date !== today || booking.status !== 'pendiente') return false
+
+            const [hours, minutes] = booking.start_time.split(':').map(Number)
+            const bookingTime = new Date()
+            bookingTime.setHours(hours, minutes, 0, 0)
+
+            const diffInMinutes = (bookingTime.getTime() - now.getTime()) / (1000 * 60)
+            
+            // Alerta si falta menos de 15 min o si ya pasó la hora pero sigue pendiente
+            return diffInMinutes <= 15
+        })
+
+        setAlerts(urgentAlerts)
     }
 
     const formatDate = (dateStr: string) => {
@@ -123,6 +153,54 @@ export function DashboardPage() {
                     </Link>
                 </div>
             </div>
+
+            {/* Alertas de Confirmación */}
+            {alerts.length > 0 && (
+                <div 
+                    className="animate-fade-in"
+                    style={{ 
+                        margin: '1rem 0',
+                        padding: '1rem',
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid var(--color-error)',
+                        borderRadius: 'var(--radius-lg)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.75rem'
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-error)', fontWeight: 700 }}>
+                        <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                        Citas sin confirmar próximas
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {alerts.map(alert => (
+                            <div 
+                                key={alert.id}
+                                style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'space-between',
+                                    background: 'var(--color-bg-card)',
+                                    padding: '0.75rem',
+                                    borderRadius: 'var(--radius-md)',
+                                    boxShadow: 'var(--shadow-sm)'
+                                }}
+                            >
+                                <div>
+                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{alert.start_time} - {alert.client_name}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>{alert.service_name}</div>
+                                </div>
+                                <Link to="/admin/bookings">
+                                    <Button variant="outline" size="sm" style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }}>
+                                        Gestionar
+                                    </Button>
+                                </Link>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* FAB Mobile */}
             <Link to="/admin/bookings" className="fab mobile-only">
