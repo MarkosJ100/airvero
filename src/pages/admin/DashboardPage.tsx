@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Card, Button, StatCardSkeleton } from '@/components/ui'
 
-// Tipos locales para el dashboard
 interface DashboardStats {
     todayBookings: number
     pendingBookings: number
@@ -38,31 +37,26 @@ export function DashboardPage() {
         try {
             const today = new Date().toISOString().split('T')[0]
 
-            // 1. Citas de hoy
             const { count: todayCount } = await supabase
                 .from('bookings')
                 .select('*', { count: 'exact', head: true })
                 .eq('booking_date', today)
                 .neq('status', 'cancelada')
 
-            // 2. Citas pendientes
             const { count: pendingCount } = await supabase
                 .from('bookings')
                 .select('*', { count: 'exact', head: true })
                 .eq('status', 'pendiente')
 
-            // 3. Citas confirmadas
             const { count: confirmedCount } = await supabase
                 .from('bookings')
                 .select('*', { count: 'exact', head: true })
                 .eq('status', 'confirmada')
 
-            // 4. Total de clientes (v2.0 - tabla clientes)
             const { count: clientesCount } = await supabase
                 .from('clientes')
                 .select('*', { count: 'exact', head: true })
 
-            // 5. Próximas citas
             const { data: bookingsData } = await supabase
                 .from('bookings')
                 .select(`
@@ -85,7 +79,6 @@ export function DashboardPage() {
                 totalClientes: clientesCount || 0
             })
 
-            // Mapear datos
             const mappedBookings = bookingsData ? bookingsData.map((b: any) => ({
                 id: b.id,
                 booking_date: b.booking_date,
@@ -96,7 +89,6 @@ export function DashboardPage() {
             })) : []
 
             setNextBookings(mappedBookings)
-
         } catch (error) {
             console.error('Error fetching dashboard data:', error)
         } finally {
@@ -109,25 +101,36 @@ export function DashboardPage() {
         return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
     }
 
+    const todayFormatted = new Date().toLocaleDateString('es-ES', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long'
+    })
+
     return (
-        <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <h2 style={{ fontSize: '1.8rem' }}>📊 Dashboard</h2>
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div style={{ paddingBottom: '5rem' }}>
+            {/* Header */}
+            <div className="page-header">
+                <div>
+                    <h2 style={{ fontSize: '1.8rem', margin: 0 }}>📊 Dashboard</h2>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)', margin: '0.25rem 0 0' }}>
+                        {todayFormatted}
+                    </p>
+                </div>
+                <div className="desktop-only">
                     <Link to="/admin/bookings">
                         <Button variant="primary">+ Nueva Reserva</Button>
                     </Link>
-                    <span style={{ fontSize: '0.9rem', color: 'gray' }}>{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
                 </div>
             </div>
 
-            {/* KPI Cards */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '1.5rem',
-                marginBottom: '2rem'
-            }}>
+            {/* FAB Mobile */}
+            <Link to="/admin/bookings" className="fab mobile-only">
+                ➕
+            </Link>
+
+            {/* Stats Grid */}
+            <div className="stats-grid">
                 {loading ? (
                     <>
                         <StatCardSkeleton />
@@ -137,52 +140,46 @@ export function DashboardPage() {
                     </>
                 ) : (
                     <>
-                        <Card>
-                            <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Citas Hoy</div>
-                            <div style={{ fontSize: '2rem', fontWeight: 700, marginTop: '0.5rem' }}>
-                                {stats.todayBookings}
-                            </div>
-                        </Card>
+                        <div className="stat-card">
+                            <div className="stat-label">📅 Citas Hoy</div>
+                            <div className="stat-value">{stats.todayBookings}</div>
+                        </div>
 
-                        <Card>
-                            <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Pendientes</div>
-                            <div style={{ fontSize: '2rem', fontWeight: 700, marginTop: '0.5rem', color: 'var(--color-warning)' }}>
+                        <div className="stat-card">
+                            <div className="stat-label">⏳ Pendientes</div>
+                            <div className="stat-value" style={{ color: 'var(--color-warning)' }}>
                                 {stats.pendingBookings}
                             </div>
-                        </Card>
+                        </div>
 
-                        <Card>
-                            <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Confirmadas</div>
-                            <div style={{ fontSize: '2rem', fontWeight: 700, marginTop: '0.5rem', color: 'var(--color-success)' }}>
+                        <div className="stat-card">
+                            <div className="stat-label">✅ Confirmadas</div>
+                            <div className="stat-value" style={{ color: 'var(--color-success)' }}>
                                 {stats.confirmedBookings}
                             </div>
-                        </Card>
+                        </div>
 
-                        <Card>
-                            <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Total Clientes</div>
-                            <div style={{ fontSize: '2rem', fontWeight: 700, marginTop: '0.5rem' }}>
-                                {stats.totalClientes}
-                            </div>
-                        </Card>
+                        <div className="stat-card">
+                            <div className="stat-label">👥 Clientes</div>
+                            <div className="stat-value">{stats.totalClientes}</div>
+                        </div>
                     </>
                 )}
             </div>
 
             {/* Próximas Citas */}
             <Card>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                    <h3>Próximas Citas</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h3 style={{ margin: 0 }}>Próximas Citas</h3>
                     <Link to="/admin/calendar">
                         <Button variant="ghost" size="sm">Ver Agenda</Button>
                     </Link>
                 </div>
 
                 {nextBookings.length === 0 ? (
-                    <p style={{ color: 'var(--color-text-secondary)', textAlign: 'center', padding: '2rem 0' }}>
-                        No hay citas próximas programadas.
-                    </p>
+                    <p className="empty-state">No hay citas próximas programadas.</p>
                 ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                         {nextBookings.map((booking) => (
                             <div
                                 key={booking.id}
@@ -190,29 +187,30 @@ export function DashboardPage() {
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
-                                    padding: '1rem',
+                                    padding: '0.75rem',
                                     border: '1px solid var(--color-border)',
                                     borderRadius: 'var(--radius-md)',
                                     backgroundColor: 'var(--color-bg-secondary)'
                                 }}
                             >
-                                <div>
-                                    <div style={{ fontWeight: 600 }}>{formatDate(booking.booking_date)} - {booking.start_time}</div>
-                                    <div style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>
-                                        {booking.client_name} • {booking.service_name}
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                                        {formatDate(booking.booking_date)} • {booking.start_time}
+                                    </div>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                                        {booking.client_name} — {booking.service_name}
                                     </div>
                                 </div>
-                                <div>
-                                    <span style={{
-                                        padding: '0.25rem 0.5rem',
-                                        borderRadius: 'var(--radius-full)',
-                                        fontSize: '0.75rem',
-                                        backgroundColor: booking.status === 'confirmada' ? 'var(--color-success)' : 'var(--color-warning)',
-                                        color: 'white'
-                                    }}>
-                                        {booking.status}
-                                    </span>
-                                </div>
+                                <span style={{
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: 'var(--radius-full)',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 500,
+                                    backgroundColor: booking.status === 'confirmada' ? 'var(--color-success)' : 'var(--color-warning)',
+                                    color: 'white'
+                                }}>
+                                    {booking.status}
+                                </span>
                             </div>
                         ))}
                     </div>

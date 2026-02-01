@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Button, Card, Loader, Input } from '@/components/ui'
+import { Button, Card, Loader } from '@/components/ui'
 import { Service } from '@/types/database.types'
 
 interface ServiceFormData {
@@ -72,13 +72,11 @@ export function ServicesPage() {
 
         try {
             if (editingId) {
-                // Actualizar
                 await (supabase
                     .from('services') as any)
                     .update(formData as any)
                     .eq('id', editingId)
             } else {
-                // Crear
                 await (supabase
                     .from('services') as any)
                     .insert({ ...formData, sort_order: services.length + 1 } as any)
@@ -95,8 +93,7 @@ export function ServicesPage() {
     }
 
     const handleDelete = async (id: string, name: string) => {
-        if (!confirm(`¿Estás seguro de eliminar el servicio "${name}"?
-Esta acción es irreversible y podría fallar si hay reservas asociadas.`)) return
+        if (!confirm(`¿Estás seguro de eliminar el servicio "${name}"?`)) return
 
         try {
             const { data, error } = await supabase
@@ -106,30 +103,22 @@ Esta acción es irreversible y podría fallar si hay reservas asociadas.`)) retu
                 .select()
 
             if (error) {
-                console.error('Error de Supabase al eliminar servicio:', error)
-
                 if (error.code === '23503') {
-                    alert('⛔ No se puede eliminar este servicio porque tiene reservas asociadas.\n\n💡 Solución: Edita el servicio y desmarca la casilla "Servicio activo" para ocultarlo al público sin perder el historial.')
-                } else if (error.code === '42501') {
-                    alert('⛔ No tienes permisos para eliminar servicios.\n\nSolo el administrador puede realizar esta acción.')
+                    alert('⛔ No se puede eliminar este servicio porque tiene reservas asociadas.')
                 } else {
-                    alert(`Error al eliminar: ${error.message} (Código: ${error.code})`)
+                    alert(`Error al eliminar: ${error.message}`)
                 }
                 return
             }
 
-            // Si no hay error pero tampoco data, es que no borró nada (posible RLS silencioso)
             if (!data || data.length === 0) {
-                alert('⚠️ No se ha eliminado el servicio.\n\nPosible causa: No tienes permisos de administrador.')
+                alert('⚠️ No se ha eliminado el servicio.')
                 return
             }
 
-            // Exito
             fetchServices()
-            alert('✅ Servicio eliminado correctamente')
         } catch (error) {
-            console.error('Error inesperado eliminando servicio:', error)
-            alert('Error inesperado al eliminar el servicio.')
+            console.error('Error eliminando servicio:', error)
         }
     }
 
@@ -148,25 +137,21 @@ Esta acción es irreversible y podría fallar si hay reservas asociadas.`)) retu
     if (loading) return <Loader />
 
     return (
-        <div>
+        <div style={{ paddingBottom: '5rem' }}>
             {/* Header */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1.5rem'
-            }}>
-                <h2>Servicios</h2>
-                <Button onClick={openCreateModal}>+ Nuevo Servicio</Button>
+            <div className="page-header">
+                <h2 style={{ margin: 0, fontSize: '1.8rem' }}>💇 Servicios</h2>
+                <Button onClick={openCreateModal} className="desktop-only">+ Nuevo Servicio</Button>
             </div>
 
-            {/* Lista de Servicios */}
+            {/* FAB Mobile */}
+            <button onClick={openCreateModal} className="fab">➕</button>
+
+            {/* Services List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {services.length === 0 ? (
                     <Card>
-                        <p style={{ textAlign: 'center', color: 'gray', padding: '2rem' }}>
-                            No hay servicios. Crea el primero.
-                        </p>
+                        <p className="empty-state">No hay servicios. Crea el primero.</p>
                     </Card>
                 ) : (
                     services.map(service => (
@@ -174,9 +159,11 @@ Esta acción es irreversible y podría fallar si hay reservas asociadas.`)) retu
                             <div style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
-                                alignItems: 'center'
+                                alignItems: 'flex-start',
+                                gap: '1rem',
+                                flexWrap: 'wrap'
                             }}>
-                                <div style={{ flex: 1 }}>
+                                <div style={{ flex: 1, minWidth: '200px' }}>
                                     <div style={{
                                         display: 'flex',
                                         alignItems: 'center',
@@ -202,13 +189,13 @@ Esta acción es irreversible y podría fallar si hay reservas asociadas.`)) retu
                                             </span>
                                         )}
                                     </div>
-                                    <div style={{ color: 'gray', fontSize: '0.9rem' }}>
-                                        {service.duration_minutes} min • {service.price}€
+                                    <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
+                                        ⏱️ {service.duration_minutes} min • 💰 {service.price}€
                                     </div>
                                     {service.description && (
                                         <div style={{
                                             fontSize: '0.85rem',
-                                            color: 'var(--color-text-secondary)',
+                                            color: 'var(--color-text-tertiary)',
                                             marginTop: '0.25rem'
                                         }}>
                                             {service.description}
@@ -216,11 +203,12 @@ Esta acción es irreversible y podría fallar si hay reservas asociadas.`)) retu
                                     )}
                                 </div>
 
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                     <Button
                                         variant="secondary"
                                         size="sm"
                                         onClick={() => toggleActive(service)}
+                                        title={service.is_active ? 'Desactivar' : 'Activar'}
                                     >
                                         {service.is_active ? '👁️' : '👁️‍🗨️'}
                                     </Button>
@@ -247,109 +235,81 @@ Esta acción es irreversible y podría fallar si hay reservas asociadas.`)) retu
 
             {/* Modal */}
             {showModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000
-                }}>
-                    <div style={{
-                        backgroundColor: 'white',
-                        padding: '2rem',
-                        borderRadius: 'var(--radius-lg)',
-                        width: '100%',
-                        maxWidth: '500px',
-                        maxHeight: '90vh',
-                        overflow: 'auto'
-                    }}>
-                        <h3 style={{ marginBottom: '1.5rem' }}>
-                            {editingId ? 'Editar Servicio' : 'Nuevo Servicio'}
-                        </h3>
+                <div className="modal-overlay" onClick={closeModal}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <h2 style={{ marginTop: 0 }}>
+                            {editingId ? '✏️ Editar Servicio' : '➕ Nuevo Servicio'}
+                        </h2>
 
                         <form onSubmit={handleSubmit}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                <div>
-                                    <label>Nombre *</label>
-                                    <Input
-                                        type="text"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        required
-                                        placeholder="Ej: Corte de pelo"
-                                    />
-                                </div>
+                            <div className="form-group">
+                                <label>Nombre *</label>
+                                <input
+                                    type="text"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    required
+                                    placeholder="Ej: Corte de pelo"
+                                    style={{ fontSize: '16px' }}
+                                />
+                            </div>
 
-                                <div>
-                                    <label>Descripción</label>
-                                    <textarea
-                                        value={formData.description}
-                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                        placeholder="Descripción opcional del servicio"
-                                        rows={3}
-                                        style={{
-                                            width: '100%',
-                                            padding: '0.75rem',
-                                            border: '1px solid var(--color-border)',
-                                            borderRadius: 'var(--radius-md)',
-                                            fontFamily: 'inherit'
-                                        }}
-                                    />
-                                </div>
+                            <div className="form-group">
+                                <label>Descripción</label>
+                                <textarea
+                                    value={formData.description}
+                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                    placeholder="Descripción opcional"
+                                    rows={3}
+                                    style={{ fontSize: '16px' }}
+                                />
+                            </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                    <div>
-                                        <label>Duración (min) *</label>
-                                        <Input
-                                            type="number"
-                                            value={formData.duration_minutes}
-                                            onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) || 0 })}
-                                            required
-                                            min={5}
-                                            step={5}
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label>Precio (€) *</label>
-                                        <Input
-                                            type="number"
-                                            value={formData.price}
-                                            onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                                            required
-                                            min={0}
-                                            step={0.5}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div className="form-group">
+                                    <label>Duración (min) *</label>
                                     <input
-                                        type="checkbox"
-                                        id="is_active"
-                                        checked={formData.is_active}
-                                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                                        type="number"
+                                        value={formData.duration_minutes}
+                                        onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) || 0 })}
+                                        required
+                                        min={5}
+                                        step={5}
+                                        style={{ fontSize: '16px' }}
                                     />
-                                    <label htmlFor="is_active" style={{ margin: 0 }}>Servicio activo</label>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Precio (€) *</label>
+                                    <input
+                                        type="number"
+                                        value={formData.price}
+                                        onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                                        required
+                                        min={0}
+                                        step={0.5}
+                                        style={{ fontSize: '16px' }}
+                                    />
                                 </div>
                             </div>
 
-                            <div style={{
-                                display: 'flex',
-                                gap: '1rem',
-                                marginTop: '1.5rem',
-                                justifyContent: 'flex-end'
-                            }}>
-                                <Button type="button" variant="secondary" onClick={closeModal}>
+                            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <input
+                                    type="checkbox"
+                                    id="is_active"
+                                    checked={formData.is_active}
+                                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                                    style={{ width: '20px', height: '20px' }}
+                                />
+                                <label htmlFor="is_active" style={{ margin: 0 }}>Servicio activo</label>
+                            </div>
+
+                            <div className="modal-actions">
+                                <button type="button" className="btn" onClick={closeModal}>
                                     Cancelar
-                                </Button>
+                                </button>
                                 <Button type="submit" isLoading={saving}>
-                                    {editingId ? 'Guardar Cambios' : 'Crear Servicio'}
+                                    {editingId ? 'Guardar' : 'Crear'}
                                 </Button>
                             </div>
                         </form>

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import type { Cliente } from '@/types/database.types'
 import { generateWhatsAppLink, formatGenericMessage } from '@/lib/whatsapp'
 import { useToast } from '@/context/ToastContext'
+import { Skeleton } from '@/components/ui'
 
 export function ClientsPage() {
     const toast = useToast()
@@ -44,7 +45,6 @@ export function ClientsPage() {
 
         try {
             if (editingCliente) {
-                // Actualizar
                 const { error } = await supabase
                     .from('clientes')
                     .update({
@@ -56,7 +56,6 @@ export function ClientsPage() {
 
                 if (error) throw error
             } else {
-                // Crear nuevo
                 const { error } = await supabase
                     .from('clientes')
                     .insert({
@@ -68,7 +67,6 @@ export function ClientsPage() {
                 if (error) throw error
             }
 
-            // Resetear y recargar
             setFormData({ nombre: '', telefono: '', notas: '' })
             setShowModal(false)
             setEditingCliente(null)
@@ -129,71 +127,81 @@ export function ClientsPage() {
         c.telefono.includes(searchTerm)
     )
 
-    if (loading) {
-        return <div className="loading">Cargando...</div>
-    }
-
     return (
-        <div className="clients-page">
+        <div style={{ paddingBottom: '5rem' }}>
+            {/* Header */}
             <div className="page-header">
-                <h1>👥 Clientes</h1>
-                <button onClick={() => openModal()} className="btn btn-primary">
+                <h2 style={{ margin: 0, fontSize: '1.8rem' }}>👥 Clientes</h2>
+                <button onClick={() => openModal()} className="btn btn-primary desktop-only">
                     + Nuevo Cliente
                 </button>
             </div>
 
-            <div className="search-box">
+            {/* FAB Mobile */}
+            <button onClick={() => openModal()} className="fab">➕</button>
+
+            {/* Search */}
+            <div style={{ marginBottom: '1.5rem' }}>
                 <input
                     type="text"
-                    placeholder="Buscar por nombre o teléfono..."
+                    placeholder="🔍 Buscar por nombre o teléfono..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="search-input"
+                    style={{ width: '100%', maxWidth: '100%' }}
                 />
             </div>
 
-            <div className="clients-grid">
-                {filteredClientes.map((cliente) => (
-                    <div key={cliente.id} className="client-card">
-                        <div className="client-header">
-                            <h3>{cliente.nombre}</h3>
-                            <button
-                                onClick={() => window.open(generateWhatsAppLink(cliente.telefono, formatGenericMessage(cliente.nombre)))}
-                                className="btn-whatsapp"
-                                title="Enviar WhatsApp"
-                            >
-                                📱
-                            </button>
-                        </div>
-
-                        <p className="client-phone">{cliente.telefono}</p>
-
-                        {cliente.notas && (
-                            <p className="client-notes">"{cliente.notas}"</p>
-                        )}
-
-                        <div className="client-actions">
-                            <button onClick={() => openModal(cliente)} className="btn btn-sm">
-                                Editar
-                            </button>
-                            <button onClick={() => handleDelete(cliente.id)} className="btn btn-sm btn-danger">
-                                Eliminar
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {filteredClientes.length === 0 && (
+            {/* Loading */}
+            {loading ? (
+                <div className="clients-grid">
+                    <Skeleton height="150px" />
+                    <Skeleton height="150px" />
+                    <Skeleton height="150px" />
+                </div>
+            ) : filteredClientes.length === 0 ? (
                 <p className="empty-state">
-                    {searchTerm ? 'No se encontraron clientes' : 'No hay clientes aún. Crea el primero!'}
+                    {searchTerm ? 'No se encontraron clientes' : 'No hay clientes aún. ¡Crea el primero!'}
                 </p>
+            ) : (
+                <div className="clients-grid">
+                    {filteredClientes.map((cliente) => (
+                        <div key={cliente.id} className="client-card">
+                            <div className="client-header">
+                                <h3>{cliente.nombre}</h3>
+                                <button
+                                    onClick={() => window.open(generateWhatsAppLink(cliente.telefono, formatGenericMessage(cliente.nombre)))}
+                                    className="btn-whatsapp"
+                                    title="Enviar WhatsApp"
+                                >
+                                    📱
+                                </button>
+                            </div>
+
+                            <p className="client-phone">📞 {cliente.telefono}</p>
+
+                            {cliente.notas && (
+                                <p className="client-notes">"{cliente.notas}"</p>
+                            )}
+
+                            <div className="client-actions">
+                                <button onClick={() => openModal(cliente)} className="btn btn-sm">
+                                    ✏️ Editar
+                                </button>
+                                <button onClick={() => handleDelete(cliente.id)} className="btn btn-sm btn-danger">
+                                    🗑️ Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             )}
 
+            {/* Modal */}
             {showModal && (
                 <div className="modal-overlay" onClick={closeModal}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <h2>{editingCliente ? 'Editar Cliente' : 'Nuevo Cliente'}</h2>
+                        <h2 style={{ marginTop: 0 }}>{editingCliente ? '✏️ Editar Cliente' : '➕ Nuevo Cliente'}</h2>
 
                         <form onSubmit={handleSubmit}>
                             <div className="form-group">
@@ -204,6 +212,7 @@ export function ClientsPage() {
                                     value={formData.nombre}
                                     onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                                     placeholder="Nombre completo"
+                                    style={{ fontSize: '16px' }}
                                 />
                             </div>
 
@@ -215,6 +224,7 @@ export function ClientsPage() {
                                     value={formData.telefono}
                                     onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
                                     placeholder="34612345678"
+                                    style={{ fontSize: '16px' }}
                                 />
                                 <small>Formato internacional sin +</small>
                             </div>
@@ -226,6 +236,7 @@ export function ClientsPage() {
                                     onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
                                     placeholder="Preferencias, observaciones..."
                                     rows={3}
+                                    style={{ fontSize: '16px' }}
                                 />
                             </div>
 
@@ -241,184 +252,6 @@ export function ClientsPage() {
                     </div>
                 </div>
             )}
-
-            <style>{`
-        .clients-page {
-          padding: 2rem;
-        }
-
-        .page-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 2rem;
-        }
-
-        .search-box {
-          margin-bottom: 2rem;
-        }
-
-        .search-input {
-          width: 100%;
-          max-width: 400px;
-          padding: 0.75rem;
-          border: 1px solid #ddd;
-          border-radius: 8px;
-          font-size: 1rem;
-        }
-
-        .clients-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-          gap: 1.5rem;
-        }
-
-        .client-card {
-          background: white;
-          border: 1px solid #e0e0e0;
-          border-radius: 12px;
-          padding: 1.5rem;
-          transition: box-shadow 0.2s;
-        }
-
-        .client-card:hover {
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
-        .client-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 0.75rem;
-        }
-
-        .client-header h3 {
-          margin: 0;
-          font-size: 1.25rem;
-        }
-
-        .btn-whatsapp {
-          background: #25D366;
-          border: none;
-          padding: 0.5rem 0.75rem;
-          border-radius: 8px;
-          cursor: pointer;
-          font-size: 1.25rem;
-          transition: transform 0.2s;
-        }
-
-        .btn-whatsapp:hover {
-          transform: scale(1.1);
-        }
-
-        .client-phone {
-          color: #666;
-          margin-bottom: 0.5rem;
-        }
-
-        .client-notes {
-          font-style: italic;
-          color: #888;
-          font-size: 0.9rem;
-          margin: 0.5rem 0;
-        }
-
-        .client-actions {
-          display: flex;
-          gap: 0.5rem;
-          margin-top: 1rem;
-        }
-
-        .empty-state {
-          text-align: center;
-          color: #999;
-          padding: 3rem;
-        }
-
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0,0,0,0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-        }
-
-        .modal-content {
-          background: white;
-          padding: 2rem;
-          border-radius: 12px;
-          max-width: 500px;
-          width: 90%;
-        }
-
-        .form-group {
-          margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-          display: block;
-          margin-bottom: 0.5rem;
-          font-weight: 500;
-        }
-
-        .form-group input,
-        .form-group textarea {
-          width: 100%;
-          padding: 0.75rem;
-          border: 1px solid #ddd;
-          border-radius: 8px;
-          font-size: 1rem;
-        }
-
-        .form-group small {
-          display: block;
-          margin-top: 0.25rem;
-          color: #666;
-          font-size: 0.85rem;
-        }
-
-        .modal-actions {
-          display: flex;
-          gap: 1rem;
-          justify-content: flex-end;
-        }
-
-        .btn {
-          padding: 0.5rem 1rem;
-          border: 1px solid #ddd;
-          border-radius: 8px;
-          background: white;
-          cursor: pointer;
-          font-size: 1rem;
-        }
-
-        .btn-primary {
-          background: #007bff;
-          color: white;
-          border-color: #007bff;
-        }
-
-        .btn-danger {
-          background: #dc3545;
-          color: white;
-          border-color: #dc3545;
-        }
-
-        .btn-sm {
-          padding: 0.375rem 0.75rem;
-          font-size: 0.875rem;
-        }
-
-        .loading {
-          text-align: center;
-          padding: 3rem;
-        }
-      `}</style>
         </div>
     )
 }

@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react'
 import { Card, Button } from '@/components/ui'
 import { loadGoogleScript, requestGoogleToken } from '@/lib/google'
 import { supabase } from '@/lib/supabase'
+import { useToast } from '@/context/ToastContext'
 
 export function SettingsPage() {
+    const toast = useToast()
     const [loading, setLoading] = useState(false)
     const [connected, setConnected] = useState(false)
-
-    // En este prototipo, "conectado" significa que tenemos el email del admin guardado en settings
-    // En prod, guardaríamos un refresh_token encriptado en el backend/edge function
+    const [connectedEmail, setConnectedEmail] = useState<string | null>(null)
 
     useEffect(() => {
         checkConnection()
@@ -22,7 +22,10 @@ export function SettingsPage() {
             .single()
 
         const settingsData = data as { value: string } | null
-        if (settingsData?.value) setConnected(true)
+        if (settingsData?.value) {
+            setConnected(true)
+            setConnectedEmail(settingsData.value)
+        }
     }
 
     const handleConnect = async () => {
@@ -31,13 +34,10 @@ export function SettingsPage() {
             await loadGoogleScript()
             const token = await requestGoogleToken()
 
-            // Obtener info del usuario para confirmar conexión
             const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                 headers: { Authorization: `Bearer ${token}` }
             }).then(res => res.json())
 
-            // Guardar email conectado como indicador (no guardamos el access_token persistente aquí por ser efímero)
-            // El admin tendrá que re-autenticarse para sincronizar si expira la sesión (común en client-side integration)
             const { error } = await (supabase.from('app_settings') as any)
                 .upsert({
                     key: 'google_calendar_connected_email',
@@ -47,14 +47,13 @@ export function SettingsPage() {
             if (error) throw error
 
             setConnected(true)
-            alert(`Conectado exitosamente como: ${userInfo.email}`)
-
-            // Guardar token temporal en sessionStorage para uso inmediato
+            setConnectedEmail(userInfo.email)
             sessionStorage.setItem('google_access_token', token)
+            toast.success(`Conectado como ${userInfo.email}`)
 
         } catch (error) {
             console.error('Error conectando:', error)
-            alert('No se pudo conectar con Google. Verifica tu configuración.')
+            toast.error('No se pudo conectar con Google')
         } finally {
             setLoading(false)
         }
@@ -64,29 +63,46 @@ export function SettingsPage() {
         await supabase.from('app_settings').delete().eq('key', 'google_calendar_connected_email')
         sessionStorage.removeItem('google_access_token')
         setConnected(false)
+        setConnectedEmail(null)
+        toast.success('Desconectado de Google Calendar')
     }
 
     return (
-        <div style={{ maxWidth: '800px' }}>
-            <h2 style={{ marginBottom: '2rem' }}>Configuración</h2>
+        <div style={{ maxWidth: '800px', paddingBottom: '3rem' }}>
+            {/* Header */}
+            <div className="page-header">
+                <h2 style={{ margin: 0, fontSize: '1.8rem' }}>⚙️ Configuración</h2>
+            </div>
 
+            {/* Google Calendar Card */}
             <Card>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Google Calendar</h3>
-                        <p style={{ color: 'gray', fontSize: '0.9rem' }}>
-                            Sincroniza tus reservas automáticamente con tu calendario.
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: '200px' }}>
+                        <h3 style={{ fontSize: '1.2rem', margin: '0 0 0.5rem' }}>
+                            📅 Google Calendar
+                        </h3>
+                        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', margin: 0 }}>
+                            Sincroniza tus reservas con tu calendario de Google.
                         </p>
                     </div>
 
-                    <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                         {connected ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                <span style={{ color: 'green', fontWeight: 500 }}>● Conectado</span>
+                            <>
+                                <div style={{ textAlign: 'right' }}>
+                                    <div style={{ color: 'var(--color-success)', fontWeight: 600, fontSize: '0.9rem' }}>
+                                        ● Conectado
+                                    </div>
+                                    {connectedEmail && (
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+                                            {connectedEmail}
+                                        </div>
+                                    )}
+                                </div>
                                 <Button variant="danger" size="sm" onClick={handleDisconnect} isLoading={loading}>
                                     Desconectar
                                 </Button>
-                            </div>
+                            </>
                         ) : (
                             <Button onClick={handleConnect} isLoading={loading}>
                                 Conectar Cuenta
@@ -96,10 +112,41 @@ export function SettingsPage() {
                 </div>
 
                 {!import.meta.env.VITE_GOOGLE_CLIENT_ID && (
-                    <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fff3cd', borderRadius: '0.5rem', fontSize: '0.9rem' }}>
-                        ⚠️ Falta configurar <code>VITE_GOOGLE_CLIENT_ID</code> en el archivo .env
+                    <div style={{
+                        marginTop: '1rem',
+                        padding: '1rem',
+                        backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                        border: '1px solid rgba(255, 193, 7, 0.3)',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: '0.9rem'
+                    }}>
+                        ⚠️ Falta configurar <code style={{ backgroundColor: 'var(--color-bg-secondary)', padding: '0.1rem 0.25rem', borderRadius: '3px' }}>VITE_GOOGLE_CLIENT_ID</code> en el archivo .env
                     </div>
                 )}
+            </Card>
+
+            {/* Version Info */}
+            <Card>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <h3 style={{ fontSize: '1.2rem', margin: '0 0 0.5rem' }}>
+                            📱 Información de la App
+                        </h3>
+                        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', margin: 0 }}>
+                            AIRVERO • Versión 2.0.0
+                        </p>
+                    </div>
+                    <div style={{
+                        padding: '0.5rem 1rem',
+                        backgroundColor: 'var(--color-bg-secondary)',
+                        borderRadius: 'var(--radius-full)',
+                        fontSize: '0.85rem',
+                        color: 'var(--color-primary)',
+                        fontWeight: 600
+                    }}>
+                        Mobile Ready
+                    </div>
+                </div>
             </Card>
         </div>
     )

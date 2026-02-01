@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button, Card, Loader } from '@/components/ui'
+import { useToast } from '@/context/ToastContext'
 
 interface ScheduleData {
     id: string
@@ -13,9 +14,11 @@ interface ScheduleData {
 const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
 export function SchedulePage() {
+    const toast = useToast()
     const [schedules, setSchedules] = useState<ScheduleData[]>([])
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState<number | null>(null)
+    const [hasChanges, setHasChanges] = useState(false)
 
     useEffect(() => {
         fetchSchedules()
@@ -28,7 +31,6 @@ export function SchedulePage() {
             .select('id, day_of_week, start_time, end_time, is_active')
             .order('day_of_week', { ascending: true })
 
-        // Asegurar que tenemos los 7 días
         const allDays: ScheduleData[] = []
         for (let i = 0; i < 7; i++) {
             const existing = (data as any[])?.find(s => s.day_of_week === i)
@@ -41,13 +43,12 @@ export function SchedulePage() {
                     is_active: existing.is_active
                 })
             } else {
-                // Crear día si no existe
                 allDays.push({
                     id: '',
                     day_of_week: i,
                     start_time: '09:00',
                     end_time: '19:00',
-                    is_active: i !== 0 // Domingo cerrado por defecto
+                    is_active: i !== 0
                 })
             }
         }
@@ -56,14 +57,11 @@ export function SchedulePage() {
         setLoading(false)
     }
 
-    const updateSchedule = async (dayIndex: number, field: keyof ScheduleData, value: any) => {
-        const schedule = schedules[dayIndex]
-        const updated = { ...schedule, [field]: value }
-
-        // Actualizar estado local inmediatamente
+    const updateSchedule = (dayIndex: number, field: keyof ScheduleData, value: any) => {
         const newSchedules = [...schedules]
-        newSchedules[dayIndex] = updated
+        newSchedules[dayIndex] = { ...newSchedules[dayIndex], [field]: value }
         setSchedules(newSchedules)
+        setHasChanges(true)
     }
 
     const saveSchedule = async (dayIndex: number) => {
@@ -72,7 +70,6 @@ export function SchedulePage() {
 
         try {
             if (schedule.id) {
-                // Actualizar existente
                 await (supabase
                     .from('schedules') as any)
                     .update({
@@ -82,7 +79,6 @@ export function SchedulePage() {
                     } as any)
                     .eq('id', schedule.id)
             } else {
-                // Crear nuevo
                 const { data } = await (supabase
                     .from('schedules') as any)
                     .insert({
@@ -100,126 +96,143 @@ export function SchedulePage() {
                     setSchedules(newSchedules)
                 }
             }
+            toast.success(`${dayNames[schedule.day_of_week]} guardado`)
         } catch (error) {
             console.error('Error guardando horario:', error)
-            alert('Error al guardar el horario')
+            toast.error('Error al guardar el horario')
         } finally {
             setSaving(null)
         }
     }
 
+    const saveAll = async () => {
+        for (let i = 0; i < 7; i++) {
+            await saveSchedule(i)
+        }
+        setHasChanges(false)
+        toast.success('Todos los horarios guardados')
+    }
+
     if (loading) return <Loader />
 
     return (
-        <div>
-            <div style={{ marginBottom: '1.5rem' }}>
-                <h2>Horarios de Apertura</h2>
-                <p style={{ color: 'gray', marginTop: '0.5rem' }}>
-                    Configura los días y horas en los que aceptas reservas.
-                </p>
+        <div style={{ paddingBottom: '6rem' }}>
+            {/* Header */}
+            <div className="page-header">
+                <div>
+                    <h2 style={{ margin: 0, fontSize: '1.8rem' }}>🕐 Horarios</h2>
+                    <p style={{ color: 'var(--color-text-secondary)', margin: '0.25rem 0 0', fontSize: '0.9rem' }}>
+                        Configura tu disponibilidad semanal
+                    </p>
+                </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Schedule Cards */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {schedules.map((schedule, idx) => (
                     <Card key={schedule.day_of_week}>
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            flexWrap: 'wrap',
-                            gap: '1rem'
+                            gap: '1rem',
+                            flexWrap: 'wrap'
                         }}>
-                            {/* Nombre del día y toggle */}
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '1rem',
-                                minWidth: '150px'
-                            }}>
-                                <label style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    cursor: 'pointer'
-                                }}>
+                            {/* Day Name + Toggle */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '140px' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '0.75rem' }}>
                                     <input
                                         type="checkbox"
                                         checked={schedule.is_active}
                                         onChange={(e) => updateSchedule(idx, 'is_active', e.target.checked)}
-                                        style={{ marginRight: '0.5rem' }}
+                                        style={{ width: '22px', height: '22px', accentColor: 'var(--color-primary)' }}
                                     />
-                                    <span style={{
-                                        fontWeight: 600,
-                                        opacity: schedule.is_active ? 1 : 0.5
-                                    }}>
+                                    <span style={{ fontWeight: 600, opacity: schedule.is_active ? 1 : 0.5 }}>
                                         {dayNames[schedule.day_of_week]}
                                     </span>
                                 </label>
                             </div>
 
-                            {/* Horarios */}
+                            {/* Time Inputs */}
                             {schedule.is_active ? (
                                 <div style={{
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '0.5rem',
+                                    gap: '0.75rem',
                                     flex: 1,
-                                    justifyContent: 'center'
+                                    justifyContent: 'center',
+                                    flexWrap: 'wrap'
                                 }}>
                                     <input
                                         type="time"
                                         value={schedule.start_time}
                                         onChange={(e) => updateSchedule(idx, 'start_time', e.target.value)}
                                         style={{
-                                            padding: '0.5rem',
+                                            padding: '0.75rem',
                                             border: '1px solid var(--color-border)',
-                                            borderRadius: 'var(--radius-md)'
+                                            borderRadius: 'var(--radius-md)',
+                                            fontSize: '1rem',
+                                            minWidth: '110px'
                                         }}
                                     />
-                                    <span>a</span>
+                                    <span style={{ fontWeight: 500 }}>a</span>
                                     <input
                                         type="time"
                                         value={schedule.end_time}
                                         onChange={(e) => updateSchedule(idx, 'end_time', e.target.value)}
                                         style={{
-                                            padding: '0.5rem',
+                                            padding: '0.75rem',
                                             border: '1px solid var(--color-border)',
-                                            borderRadius: 'var(--radius-md)'
+                                            borderRadius: 'var(--radius-md)',
+                                            fontSize: '1rem',
+                                            minWidth: '110px'
                                         }}
                                     />
                                 </div>
                             ) : (
-                                <div style={{
-                                    flex: 1,
-                                    textAlign: 'center',
-                                    color: 'gray',
-                                    fontStyle: 'italic'
-                                }}>
+                                <div style={{ flex: 1, textAlign: 'center', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
                                     Cerrado
                                 </div>
                             )}
 
-                            {/* Botón guardar */}
+                            {/* Save Button */}
                             <Button
                                 size="sm"
                                 onClick={() => saveSchedule(idx)}
                                 isLoading={saving === idx}
                             >
-                                Guardar
+                                💾
                             </Button>
                         </div>
                     </Card>
                 ))}
             </div>
 
+            {/* Save All Button */}
+            {hasChanges && (
+                <div style={{
+                    position: 'fixed',
+                    bottom: '1.5rem',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 100
+                }}>
+                    <Button onClick={saveAll} style={{ padding: '1rem 2rem', fontSize: '1rem', boxShadow: 'var(--shadow-xl)' }}>
+                        💾 Guardar Todo
+                    </Button>
+                </div>
+            )}
+
+            {/* Tip */}
             <div style={{
                 marginTop: '2rem',
                 padding: '1rem',
                 backgroundColor: 'var(--color-bg-secondary)',
                 borderRadius: 'var(--radius-md)',
                 fontSize: '0.9rem',
-                color: 'gray'
+                color: 'var(--color-text-secondary)'
             }}>
-                💡 <strong>Tip:</strong> Los cambios se aplican inmediatamente a las nuevas reservas.
+                💡 <strong>Tip:</strong> Los cambios se aplican a las nuevas reservas inmediatamente.
                 Las reservas existentes no se ven afectadas.
             </div>
         </div>
