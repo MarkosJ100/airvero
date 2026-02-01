@@ -23,6 +23,10 @@ jobs:
 
       - name: Build Web App
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://valbywilixexmhbnssye.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_Lfq3VVRrJMeK6J6inezI_w_NPWE5by5
+          VITE_GOOGLE_CLIENT_ID: 478300349997-90a57r4pui9q95c2b5f270dcrqtqnpn5.apps.googleusercontent.com
 
       - name: Sync Capacitor
         run: npx cap sync android
