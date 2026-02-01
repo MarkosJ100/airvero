@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Booking, Cliente, Service, BookingWithRelations } from '@/types/database.types'
@@ -13,8 +12,9 @@ export function BookingsPage() {
   const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
-  const [filter, setFilter] = useState<'all' | 'pendiente' | 'confirmada'>('all')
+  const [filter, setFilter] = useState<'all' | 'pendiente' | 'confirmada' | 'completada'>('all')
 
+  // Formulario
   const [formData, setFormData] = useState({
     cliente_id: '',
     service_id: '',
@@ -35,10 +35,7 @@ export function BookingsPage() {
       const [bookingsRes, clientesRes, servicesRes] = await Promise.all([
         supabase
           .from('bookings')
-          .select(`
-            *,
-            clientes:cliente_id (*)
-          `)
+          .select(`*, cliente:cliente_id (*), service:service_id (*)`)
           .order('booking_date', { ascending: false })
           .order('start_time'),
         supabase.from('clientes').select('*').order('nombre'),
@@ -49,7 +46,10 @@ export function BookingsPage() {
       if (clientesRes.error) throw clientesRes.error
       if (servicesRes.error) throw servicesRes.error
 
-      setBookings(bookingsRes.data || [])
+      // NOTA: Supabase devuelve { cliente: {...}, service: {...} } gracias a los alias.
+      // BookingWithRelations espera cliente?: Cliente y service?: Service.
+      // El cast as strict BookingWithRelations[] funciona si los datos coinciden.
+      setBookings(bookingsRes.data as unknown as BookingWithRelations[])
       setClientes(clientesRes.data || [])
       setServices(servicesRes.data || [])
     } catch (error) {
@@ -60,34 +60,28 @@ export function BookingsPage() {
     }
   }
 
-  // Auto-sugerencia de hora cuando cambia servicio o fecha
+  // Lógica de sugerencia de hora
   useEffect(() => {
     if (formData.service_id && formData.booking_date) {
       const service = services.find(s => s.id === formData.service_id)
       if (service) {
-        const horaSugerida = calcularProximoSlotDisponible(
+        const sugerida = calcularProximoSlotDisponible(
           formData.booking_date,
           service.duration_minutes,
           bookings,
           '09:00',
           '20:00'
         )
-
-        if (horaSugerida) {
-          const horaFin = calcularHoraFin(horaSugerida, service.duration_minutes)
-          setFormData(prev => ({
-            ...prev,
-            start_time: horaSugerida,
-            end_time: horaFin
-          }))
+        if (sugerida) {
+          const fin = calcularHoraFin(sugerida, service.duration_minutes)
+          setFormData(prev => ({ ...prev, start_time: sugerida, end_time: fin }))
           setHoraSugerida(true)
         }
       }
     }
-  }, [formData.service_id, formData.booking_date, services, bookings])
+  }, [formData.service_id, formData.booking_date])
 
-  // Actualizar hora fin cuando cambia hora inicio manualmente
-  function handleStartTimeChange(newStartTime: string) {
+  const handleStartTimeChange = (newStartTime: string) => {
     const service = services.find(s => s.id === formData.service_id)
     if (service && newStartTime) {
       const newEndTime = calcularHoraFin(newStartTime, service.duration_minutes)
@@ -98,10 +92,9 @@ export function BookingsPage() {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    // Validar conflictos antes de guardar
+    // Validación básica de conflictos
     const service = services.find(s => s.id === formData.service_id)
     if (service) {
       const { hayConflicto, reservaConflicto } = validarConflictoReservas(
@@ -110,291 +103,270 @@ export function BookingsPage() {
         service.duration_minutes,
         bookings
       )
-
       if (hayConflicto && reservaConflicto) {
-        const clienteConflicto = bookings.find(b => b.id === reservaConflicto.id)?.cliente as Cliente | undefined
-        toast.error(
-          `Conflicto: Ya existe una reserva de ${clienteConflicto?.nombre || 'un cliente'} a las ${formatTime(reservaConflicto.start_time)}`
-        )
+        toast.error(`Conflicto con reserva a las ${formatTime(reservaConflicto.start_time)}`)
         return
       }
     }
 
     try {
-      const { error } = await supabase
-        .from('bookings')
-        .insert({
-          cliente_id: formData.cliente_id,
-          service_id: formData.service_id,
-          booking_date: formData.booking_date,
-          start_time: formData.start_time,
-          end_time: formData.end_time,
-          status: formData.status,
-          notes: formData.notes || null
-        })
-
-      if (error) throw error
-
-      setFormData({
-        cliente_id: '',
-        service_id: '',
-        booking_date: '',
-        start_time: '',
-        end_time: '',
-        status: 'pendiente',
-        notes: ''
+      const { error } = await supabase.from('bookings').insert({
+        cliente_id: formData.cliente_id,
+        service_id: formData.service_id,
+        booking_date: formData.booking_date,
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        status: formData.status,
+        notes: formData.notes || null
       })
-      setHoraSugerida(false)
-      setShowModal(false)
-      toast.success('Reserva creada correctamente')
-      fetchData()
-    } catch (error: any) {
-      console.error('Error creating booking:', error)
-      toast.error(error?.message || 'Error al crear reserva')
-    }
-  }
-
-  async function updateStatus(id: string, status: Booking['status']) {
-    try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status })
-        .eq('id', id)
-
       if (error) throw error
-      toast.success('Estado actualizado')
+
+      setFormData({ cliente_id: '', service_id: '', booking_date: '', start_time: '', end_time: '', status: 'pendiente', notes: '' })
+      setShowModal(false)
+      toast.success('Reserva creada exitosamente')
       fetchData()
     } catch (error) {
-      console.error('Error updating status:', error)
-      toast.error('Error al actualizar estado')
+      console.error(error)
+      toast.error('Error al crear reserva')
     }
   }
 
-  async function deleteBooking(id: string, clienteName: string) {
-    const confirmed = window.confirm(
-      `¿Estás seguro de eliminar la reserva de ${clienteName}?\n\nEsta acción no se puede deshacer.`
-    )
-
-    if (!confirmed) return
-
+  const updateStatus = async (id: string, status: Booking['status']) => {
     try {
-      const { error } = await supabase
-        .from('bookings')
-        .delete()
-        .eq('id', id)
-
+      const { error } = await supabase.from('bookings').update({ status }).eq('id', id)
       if (error) throw error
-
-      toast.success('Reserva eliminada correctamente')
+      toast.success(`Estado actualizado a ${status}`)
       fetchData()
-    } catch (error: any) {
-      console.error('Error deleting booking:', error)
-      toast.error('Error al eliminar la reserva')
+    } catch (error) {
+      toast.error('Error actualizando estado')
     }
   }
 
-  const filteredBookings = bookings.filter(b => filter === 'all' || b.status === filter)
-
-  const statusColors = {
-    pendiente: 'var(--color-warning)',
-    confirmada: 'var(--color-success)',
-    cancelada: 'var(--color-error)',
-    completada: 'var(--color-info)'
+  const deleteBooking = async (id: string, nombre: string) => {
+    if (!confirm(`¿Eliminar reserva de ${nombre}?`)) return
+    try {
+      const { error } = await supabase.from('bookings').delete().eq('id', id)
+      if (error) throw error
+      toast.success('Reserva eliminada')
+      fetchData()
+    } catch (error) {
+      toast.error('Error al eliminar')
+    }
   }
 
-  if (loading) return <div className="loading" style={{ textAlign: 'center', padding: '2rem' }}>Cargando reservas...</div>
+  // Filtrado y Ordenamiento Inteligente
+  const filteredBookings = bookings
+    .filter(b => filter === 'all' || b.status === filter)
+    .sort((a, b) => {
+      // 1. Pendientes primero
+      if (a.status === 'pendiente' && b.status !== 'pendiente') return -1
+      if (a.status !== 'pendiente' && b.status === 'pendiente') return 1
+
+      // 2. Por fecha (más cercana primero)
+      const dateA = new Date(a.booking_date + 'T' + a.start_time)
+      const dateB = new Date(b.booking_date + 'T' + b.start_time)
+      return dateA.getTime() - dateB.getTime()
+    })
+
+  const getDayInfo = (dateStr: string) => {
+    const date = new Date(dateStr)
+    return {
+      day: date.getDate(),
+      month: date.toLocaleDateString('es-ES', { month: 'short' }).replace('.', ''),
+      weekday: date.toLocaleDateString('es-ES', { weekday: 'short' }).replace('.', '')
+    }
+  }
+
+  if (loading) return (
+    <div style={{ padding: '20px' }}>
+      <div className="skeleton-premium skeleton-card"></div>
+      <div className="skeleton-premium skeleton-card"></div>
+      <div className="skeleton-premium skeleton-card"></div>
+    </div>
+  )
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      {/* Header */}
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
-        <h1 style={{ fontSize: '1.8rem' }}>📋 Reservas</h1>
-        <button onClick={() => setShowModal(true)} className="btn btn-primary hide-mobile">
-          ➕ Nueva Reserva
-        </button>
+    <div style={{ paddingBottom: '100px', maxWidth: '800px', margin: '0 auto' }}>
+      {/* Premium Header */}
+      <div className="page-title-premium">
+        <h1>Reservas</h1>
+        <div className="subtitle">
+          {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+        </div>
       </div>
 
-      {/* Mobile FAB */}
-      <button onClick={() => setShowModal(true)} className="fab">
-        ➕
-      </button>
-
-      {/* Filters Scrollable */}
-      <div className="filters-scroll">
-        <button
-          className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-          onClick={() => setFilter('all')}
-        >
-          Todas ({bookings.length})
-        </button>
-        <button
-          className={`filter-btn ${filter === 'pendiente' ? 'active' : ''}`}
-          onClick={() => setFilter('pendiente')}
-        >
-          🟡 Pendientes ({bookings.filter(b => b.status === 'pendiente').length})
-        </button>
-        <button
-          className={`filter-btn ${filter === 'confirmada' ? 'active' : ''}`}
-          onClick={() => setFilter('confirmada')}
-        >
-          🟢 Confirmadas ({bookings.filter(b => b.status === 'confirmada').length})
-        </button>
+      {/* Filter Chips */}
+      <div className="filter-chips">
+        {[
+          { key: 'all', label: 'Todas', count: bookings.length },
+          { key: 'pendiente', label: 'Pendientes', count: bookings.filter(b => b.status === 'pendiente').length },
+          { key: 'confirmada', label: 'Confirmadas', count: bookings.filter(b => b.status === 'confirmada').length },
+          { key: 'completada', label: 'Completadas', count: bookings.filter(b => b.status === 'completada').length }
+        ].map(f => (
+          <button
+            key={f.key}
+            className={`filter-chip ${filter === f.key ? 'active' : ''}`}
+            onClick={() => setFilter(f.key as any)}
+          >
+            {filter === f.key && <span className="status-dot" style={{ background: 'var(--color-primary)' }}></span>}
+            {f.label}
+            <span className="count">{f.count}</span>
+          </button>
+        ))}
       </div>
 
-      {/* List Grid */}
-      <div className="grid-responsive">
-        {filteredBookings.map((booking) => {
-          const cliente = booking.cliente as Cliente
-          const service = services.find(s => s.id === booking.service_id)
+      {/* Bookings List */}
+      {filteredBookings.length === 0 ? (
+        <div className="empty-state-premium">
+          <div className="icon">📭</div>
+          <h3>No hay reservas aquí</h3>
+          <p>Parece que tienes el día libre en esta categoría</p>
+          <button className="btn-action-primary" onClick={() => setShowModal(true)}>
+            Crear nueva reserva
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {filteredBookings.map((booking) => {
+            const { day, month, weekday } = getDayInfo(booking.booking_date)
+            // Aquí usamos el acceso seguro a las propiedades
+            const clienteNombre = booking.cliente?.nombre || 'Cliente'
+            const clienteTelefono = booking.cliente?.telefono
+            const servicioNombre = booking.service?.name || 'Servicio'
 
-          return (
-            <div key={booking.id} className="card-mobile">
-              {/* Card Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{cliente?.nombre || 'Desconocido'}</h3>
-                  <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
-                    {service?.name || 'Servicio'}
+            return (
+              <div key={booking.id} className="booking-card">
+                <div className="booking-card-inner">
+                  {/* Date Block */}
+                  <div className="booking-date-block">
+                    <span className="day">{day}</span>
+                    <span className="month">{month}</span>
+                    <span className="weekday">{weekday}</span>
+                  </div>
+
+                  {/* Content */}
+                  <div className="booking-content">
+                    <div className="booking-client">{clienteNombre}</div>
+                    <div className="booking-service">{servicioNombre}</div>
+                    <div className="booking-time">
+                      ⏰ {booking.start_time.substring(0, 5)} - {booking.end_time.substring(0, 5)}
+                    </div>
+                  </div>
+
+                  {/* Status Icon */}
+                  <div className={`booking-status ${booking.status}`}>
+                    <span className={`status-dot ${booking.status}`}></span>
+                    {booking.status}
                   </div>
                 </div>
-                <span style={{
-                  padding: '0.25rem 0.5rem',
-                  borderRadius: 'var(--radius-full)',
-                  fontSize: '0.75rem',
-                  backgroundColor: statusColors[booking.status] || '#ccc',
-                  color: 'white',
-                  fontWeight: 600
-                }}>
-                  {booking.status.toUpperCase()}
-                </span>
-              </div>
 
-              {/* Card Body */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  📅 <strong>{new Date(booking.booking_date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</strong>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  ⏰ {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
-                </div>
                 {booking.notes && (
-                  <div style={{ fontSize: '0.9rem', fontStyle: 'italic', background: 'var(--color-bg-secondary)', padding: '0.5rem', borderRadius: '4px' }}>
-                    💬 {booking.notes}
+                  <div className="booking-notes">
+                    "{booking.notes}"
                   </div>
                 )}
-              </div>
 
-              {/* WhatsApp Button Big */}
-              <button
-                style={{
-                  width: '100%',
-                  marginTop: '1rem',
-                  padding: '0.75rem',
-                  background: '#25D366',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md)',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  cursor: 'pointer'
-                }}
-                onClick={() => {
-                  const message = formatConfirmationMessage(cliente?.nombre || '', formatDateSpanish(booking.booking_date), formatTime(booking.start_time))
-                  window.open(generateWhatsAppLink(cliente?.telefono || '', message))
-                }}
-              >
-                📱 Hablar por WhatsApp
-              </button>
+                {/* Actions */}
+                <div className="booking-actions">
+                  {/* Primary Action Button Logic */}
+                  {booking.status === 'pendiente' && (
+                    <button className="btn-action-primary" onClick={() => updateStatus(booking.id, 'confirmada')}>
+                      ✅ Confirmar
+                    </button>
+                  )}
+                  {booking.status === 'confirmada' && (
+                    <button className="btn-action-primary" style={{ background: 'var(--color-primary)' }} onClick={() => updateStatus(booking.id, 'completada')}>
+                      ✨ Completar
+                    </button>
+                  )}
 
-              {/* Action Grid (Icon Buttons) */}
-              <div className="actions-grid">
-                {booking.status === 'pendiente' && (
-                  <button className="action-btn-icon" onClick={() => updateStatus(booking.id, 'confirmada')} title="Confirmar">
-                    <span style={{ fontSize: '1.2rem' }}>✅</span> Confirmar
+                  {/* WhatsApp Button (Always visible) */}
+                  <button
+                    className="btn-action-whatsapp"
+                    onClick={() => {
+                      const msg = formatConfirmationMessage(clienteNombre, formatDateSpanish(booking.booking_date), formatTime(booking.start_time))
+                      window.open(generateWhatsAppLink(clienteTelefono || '', msg))
+                    }}
+                  >
+                    <span className="whatsapp-icon">💬</span> WhatsApp
                   </button>
-                )}
 
-                {(booking.status === 'pendiente' || booking.status === 'confirmada') && (
-                  <button className="action-btn-icon" onClick={() => updateStatus(booking.id, 'completada')} title="Completar">
-                    <span style={{ fontSize: '1.2rem' }}>✔️</span> Completar
+                  {/* Delete/Cancel (Icon only) */}
+                  <button
+                    className="btn-action-danger"
+                    style={{ flex: '0 0 auto', width: '48px', padding: '0' }}
+                    onClick={() => deleteBooking(booking.id, clienteNombre)}
+                  >
+                    🗑️
                   </button>
-                )}
-
-                <button className="action-btn-icon" onClick={() => updateStatus(booking.id, 'cancelada')} title="Cancelar">
-                  <span style={{ fontSize: '1.2rem' }}>❌</span> Cancelar
-                </button>
-
-                <button className="action-btn-icon" onClick={() => deleteBooking(booking.id, cliente?.nombre || '')} title="Eliminar">
-                  <span style={{ fontSize: '1.2rem' }}>🗑️</span> Eliminar
-                </button>
+                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {filteredBookings.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
-          <p>No hay reservas encontradas</p>
+            )
+          })}
         </div>
       )}
 
-      {/* Modal - Improved for Mobile */}
+      {/* Premium FAB */}
+      <button
+        className={`fab-premium ${showModal ? 'open' : ''}`}
+        onClick={() => setShowModal(true)}
+        aria-label="Nueva Reserva"
+      >
+        <span className="plus-icon">➕</span>
+      </button>
+
+      {/* Premium Modal */}
       {showModal && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
-        }} onClick={() => setShowModal(false)}>
-          <div style={{
-            background: 'var(--color-bg-card)', padding: '1.5rem', borderRadius: 'var(--radius-lg)',
-            width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto'
-          }} onClick={e => e.stopPropagation()}>
-            <h2 style={{ marginTop: 0 }}>Nueva Reserva</h2>
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Cliente</label>
-                <select required value={formData.cliente_id} onChange={e => setFormData({ ...formData, cliente_id: e.target.value })}
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '1rem' }}>
-                  <option value="">Seleccionar...</option>
-                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                </select>
-              </div>
+        <div className="modal-premium-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-premium" onClick={e => e.stopPropagation()}>
+            <div className="modal-premium-header">
+              <h2>✨ Nueva Reserva</h2>
+              <button className="modal-close-btn" onClick={() => setShowModal(false)}>×</button>
+            </div>
 
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Servicio</label>
-                <select required value={formData.service_id} onChange={e => setFormData({ ...formData, service_id: e.target.value })}
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '1rem' }}>
-                  <option value="">Seleccionar...</option>
-                  {services.map(s => <option key={s.id} value={s.id}>{s.name} ({s.duration_minutes} min)</option>)}
-                </select>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Fecha</label>
-                  <input type="date" required value={formData.booking_date} onChange={e => setFormData({ ...formData, booking_date: e.target.value })}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }} />
+            <form onSubmit={handleSubmit}>
+              <div className="modal-premium-body">
+                <div className="form-field-premium">
+                  <label>Cliente</label>
+                  <select required value={formData.cliente_id} onChange={e => setFormData({ ...formData, cliente_id: e.target.value })}>
+                    <option value="">Selecciona un cliente...</option>
+                    {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  </select>
                 </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Hora {horaSugerida && '✨'}</label>
-                  <input type="time" required value={formData.start_time} onChange={e => handleStartTimeChange(e.target.value)}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }} />
+
+                <div className="form-field-premium">
+                  <label>Servicio</label>
+                  <select required value={formData.service_id} onChange={e => setFormData({ ...formData, service_id: e.target.value })}>
+                    <option value="">Selecciona un servicio...</option>
+                    {services.map(s => <option key={s.id} value={s.id}>{s.name} ({s.duration_minutes} min)</option>)}
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-field-premium">
+                    <label>Fecha</label>
+                    <input type="date" required value={formData.booking_date} onChange={e => setFormData({ ...formData, booking_date: e.target.value })} />
+                  </div>
+                  <div className="form-field-premium">
+                    <label>Hora</label>
+                    <input type="time" required value={formData.start_time} onChange={e => handleStartTimeChange(e.target.value)} />
+                    {horaSugerida && <div className="hint">✨ Hora sugerida automáticamente</div>}
+                  </div>
+                </div>
+
+                <div className="form-field-premium">
+                  <label>Notas (Opcional)</label>
+                  <textarea rows={2} value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Preferencias, detalles..." />
                 </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Notas</label>
-                <textarea value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }} rows={3} />
-              </div>
-
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary" style={{ flex: 1 }}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Guardar</button>
+              <div className="modal-premium-footer">
+                <button type="button" className="modal-btn-cancel" onClick={() => setShowModal(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="modal-btn-submit">
+                  Confirmar Reserva
+                </button>
               </div>
             </form>
           </div>
