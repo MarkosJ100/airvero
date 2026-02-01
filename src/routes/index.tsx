@@ -1,8 +1,5 @@
 import { createHashRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { AdminLayout } from '@/components/layout/AdminLayout'
-import { AuthLayout } from '@/components/layout/AuthLayout'
-import { ProtectedRoute } from './ProtectedRoute'
-import { LoginPage } from '@/pages/auth/LoginPage'
 import { DashboardPage } from '@/pages/admin/DashboardPage'
 import { CalendarPage } from '@/pages/admin/CalendarPage'
 import { BookingsPage } from '@/pages/admin/BookingsPage'
@@ -19,18 +16,9 @@ const router = createHashRouter([
         element: <Navigate to="/admin/dashboard" replace />,
     },
 
-    // Auth Routes (solo login, sin registro)
-    {
-        element: <AuthLayout />,
-        children: [
-            { path: 'login', element: <LoginPage /> },
-        ],
-    },
-
-    // Admin Routes (solo admin)
+    // Admin Routes (Direct Access)
     {
         path: '/admin',
-        element: <ProtectedRoute requireAdmin />,
         children: [
             {
                 element: <AdminLayout />,

@@ -1,18 +1,10 @@
 import { useState } from 'react'
-import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
-import { useAuth } from '@/context/AuthContext'
+import { Outlet, Link, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui'
 
 export function AdminLayout() {
-    const { signOut } = useAuth()
-    const navigate = useNavigate()
     const location = useLocation()
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-
-    const handleSignOut = async () => {
-        await signOut()
-        navigate('/login')
-    }
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen)
     const closeSidebar = () => setIsSidebarOpen(false)
@@ -104,10 +96,8 @@ export function AdminLayout() {
                     ))}
                 </nav>
 
-                <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
-                    <Button variant="secondary" onClick={handleSignOut} fullWidth>
-                        🚪 Cerrar Sesión
-                    </Button>
+                <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', textAlign: 'center', opacity: 0.5, fontSize: '0.8rem' }}>
+                    AIRVERO v2.3
                 </div>
             </aside>
 
