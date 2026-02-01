@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Booking, Cliente, Service, BookingWithRelations } from '@/types/database.types'
@@ -149,9 +150,6 @@ export function BookingsPage() {
       fetchData()
     } catch (error: any) {
       console.error('Error creating booking:', error)
-      console.error('Error message:', error?.message)
-      console.error('Error details:', error?.details)
-      console.error('Error hint:', error?.hint)
       toast.error(error?.message || 'Error al crear reserva')
     }
   }
@@ -185,43 +183,44 @@ export function BookingsPage() {
         .delete()
         .eq('id', id)
 
-      if (error) {
-        console.error('Error al eliminar reserva:', error)
-        toast.error(`Error al eliminar la reserva: ${error.message}`)
-        return
-      }
+      if (error) throw error
 
       toast.success('Reserva eliminada correctamente')
       fetchData()
-    } catch (error) {
-      console.error('Error inesperado eliminando reserva:', error)
-      toast.error('Error inesperado al eliminar la reserva')
+    } catch (error: any) {
+      console.error('Error deleting booking:', error)
+      toast.error('Error al eliminar la reserva')
     }
   }
 
   const filteredBookings = bookings.filter(b => filter === 'all' || b.status === filter)
 
   const statusColors = {
-    pendiente: '#ffc107',
-    confirmada: '#28a745',
-    cancelada: '#6c757d',
-    completada: '#17a2b8'
+    pendiente: 'var(--color-warning)',
+    confirmada: 'var(--color-success)',
+    cancelada: 'var(--color-error)',
+    completada: 'var(--color-info)'
   }
 
-  if (loading) {
-    return <div className="loading">Cargando...</div>
-  }
+  if (loading) return <div className="loading" style={{ textAlign: 'center', padding: '2rem' }}>Cargando reservas...</div>
 
   return (
-    <div className="bookings-page">
-      <div className="page-header">
-        <h1>📋 Reservas</h1>
-        <button onClick={() => setShowModal(true)} className="btn btn-primary">
+    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      {/* Header */}
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', alignItems: 'center' }}>
+        <h1 style={{ fontSize: '1.8rem' }}>📋 Reservas</h1>
+        <button onClick={() => setShowModal(true)} className="btn btn-primary hide-mobile">
           ➕ Nueva Reserva
         </button>
       </div>
 
-      <div className="filters">
+      {/* Mobile FAB */}
+      <button onClick={() => setShowModal(true)} className="fab">
+        ➕
+      </button>
+
+      {/* Filters Scrollable */}
+      <div className="filters-scroll">
         <button
           className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
           onClick={() => setFilter('all')}
@@ -242,80 +241,95 @@ export function BookingsPage() {
         </button>
       </div>
 
-      <div className="bookings-list">
+      {/* List Grid */}
+      <div className="grid-responsive">
         {filteredBookings.map((booking) => {
           const cliente = booking.cliente as Cliente
           const service = services.find(s => s.id === booking.service_id)
 
           return (
-            <div key={booking.id} className="booking-card">
-              <div className="booking-header">
-                <div className="booking-info">
-                  <h3>{cliente?.nombre || 'Cliente no encontrado'}</h3>
-                  <p className="service-name">💇 {service?.name || 'Servicio'}</p>
+            <div key={booking.id} className="card-mobile">
+              {/* Card Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{cliente?.nombre || 'Desconocido'}</h3>
+                  <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
+                    {service?.name || 'Servicio'}
+                  </div>
                 </div>
-                <button
-                  onClick={() => {
-                    const message = formatConfirmationMessage(
-                      cliente?.nombre || '',
-                      formatDateSpanish(booking.booking_date),
-                      formatTime(booking.start_time)
-                    )
-                    window.open(generateWhatsAppLink(cliente?.telefono || '', message))
-                  }}
-                  className="btn-whatsapp"
-                  title="Confirmar por WhatsApp"
-                >
-                  <span className="whatsapp-icon">📱</span>
-                  <span className="whatsapp-text">WhatsApp</span>
-                </button>
-              </div>
-
-              <div className="booking-details">
-                <p><strong>📅</strong> {new Date(booking.booking_date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-                <p><strong>🕐</strong> {formatTime(booking.start_time)} - {formatTime(booking.end_time)}</p>
-                {booking.notes && <p className="notes"><strong>💬</strong> {booking.notes}</p>}
-              </div>
-
-              <div className="booking-footer">
-                <div className="status-badge" style={{ backgroundColor: statusColors[booking.status] }}>
+                <span style={{
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: 'var(--radius-full)',
+                  fontSize: '0.75rem',
+                  backgroundColor: statusColors[booking.status] || '#ccc',
+                  color: 'white',
+                  fontWeight: 600
+                }}>
                   {booking.status.toUpperCase()}
-                </div>
+                </span>
+              </div>
 
-                <div className="booking-actions">
-                  {booking.status === 'pendiente' && (
-                    <button
-                      onClick={() => updateStatus(booking.id, 'confirmada')}
-                      className="action-btn btn-confirm"
-                      title="Confirmar reserva"
-                    >
-                      ✅ Confirmar
-                    </button>
-                  )}
-                  {(booking.status === 'pendiente' || booking.status === 'confirmada') && (
-                    <button
-                      onClick={() => updateStatus(booking.id, 'completada')}
-                      className="action-btn btn-complete"
-                      title="Marcar como completada"
-                    >
-                      ✔️ Completar
-                    </button>
-                  )}
-                  <button
-                    onClick={() => updateStatus(booking.id, 'cancelada')}
-                    className="action-btn btn-cancel"
-                    title="Cancelar reserva"
-                  >
-                    ❌ Cancelar
-                  </button>
-                  <button
-                    onClick={() => deleteBooking(booking.id, cliente?.nombre || 'este cliente')}
-                    className="action-btn btn-delete"
-                    title="Eliminar reserva permanentemente"
-                  >
-                    🗑️ Eliminar
-                  </button>
+              {/* Card Body */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  📅 <strong>{new Date(booking.booking_date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</strong>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  ⏰ {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
+                </div>
+                {booking.notes && (
+                  <div style={{ fontSize: '0.9rem', fontStyle: 'italic', background: 'var(--color-bg-secondary)', padding: '0.5rem', borderRadius: '4px' }}>
+                    💬 {booking.notes}
+                  </div>
+                )}
+              </div>
+
+              {/* WhatsApp Button Big */}
+              <button
+                style={{
+                  width: '100%',
+                  marginTop: '1rem',
+                  padding: '0.75rem',
+                  background: '#25D366',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  cursor: 'pointer'
+                }}
+                onClick={() => {
+                  const message = formatConfirmationMessage(cliente?.nombre || '', formatDateSpanish(booking.booking_date), formatTime(booking.start_time))
+                  window.open(generateWhatsAppLink(cliente?.telefono || '', message))
+                }}
+              >
+                📱 Hablar por WhatsApp
+              </button>
+
+              {/* Action Grid (Icon Buttons) */}
+              <div className="actions-grid">
+                {booking.status === 'pendiente' && (
+                  <button className="action-btn-icon" onClick={() => updateStatus(booking.id, 'confirmada')} title="Confirmar">
+                    <span style={{ fontSize: '1.2rem' }}>✅</span> Confirmar
+                  </button>
+                )}
+
+                {(booking.status === 'pendiente' || booking.status === 'confirmada') && (
+                  <button className="action-btn-icon" onClick={() => updateStatus(booking.id, 'completada')} title="Completar">
+                    <span style={{ fontSize: '1.2rem' }}>✔️</span> Completar
+                  </button>
+                )}
+
+                <button className="action-btn-icon" onClick={() => updateStatus(booking.id, 'cancelada')} title="Cancelar">
+                  <span style={{ fontSize: '1.2rem' }}>❌</span> Cancelar
+                </button>
+
+                <button className="action-btn-icon" onClick={() => deleteBooking(booking.id, cliente?.nombre || '')} title="Eliminar">
+                  <span style={{ fontSize: '1.2rem' }}>🗑️</span> Eliminar
+                </button>
               </div>
             </div>
           )
@@ -323,467 +337,69 @@ export function BookingsPage() {
       </div>
 
       {filteredBookings.length === 0 && (
-        <div className="empty-state">
-          <p className="empty-icon">📭</p>
-          <p className="empty-text">No hay reservas {filter !== 'all' ? filter + 's' : ''}</p>
-          <button onClick={() => setShowModal(true)} className="btn btn-primary">
-            ➕ Crear Primera Reserva
-          </button>
+        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-secondary)' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
+          <p>No hay reservas encontradas</p>
         </div>
       )}
 
+      {/* Modal - Improved for Mobile */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>📋 Nueva Reserva</h2>
-
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Cliente *</label>
-                <select
-                  required
-                  value={formData.cliente_id}
-                  onChange={(e) => setFormData({ ...formData, cliente_id: e.target.value })}
-                >
-                  <option value="">Seleccionar cliente...</option>
-                  {clientes.map(c => (
-                    <option key={c.id} value={c.id}>{c.nombre}</option>
-                  ))}
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }} onClick={() => setShowModal(false)}>
+          <div style={{
+            background: 'var(--color-bg-card)', padding: '1.5rem', borderRadius: 'var(--radius-lg)',
+            width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto'
+          }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ marginTop: 0 }}>Nueva Reserva</h2>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Cliente</label>
+                <select required value={formData.cliente_id} onChange={e => setFormData({ ...formData, cliente_id: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '1rem' }}>
+                  <option value="">Seleccionar...</option>
+                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
               </div>
 
-              <div className="form-group">
-                <label>Servicio *</label>
-                <select
-                  required
-                  value={formData.service_id}
-                  onChange={(e) => setFormData({ ...formData, service_id: e.target.value })}
-                >
-                  <option value="">Seleccionar servicio...</option>
-                  {services.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.duration_minutes} min)</option>
-                  ))}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Servicio</label>
+                <select required value={formData.service_id} onChange={e => setFormData({ ...formData, service_id: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '1rem' }}>
+                  <option value="">Seleccionar...</option>
+                  {services.map(s => <option key={s.id} value={s.id}>{s.name} ({s.duration_minutes} min)</option>)}
                 </select>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Fecha *</label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.booking_date}
-                    onChange={(e) => setFormData({ ...formData, booking_date: e.target.value })}
-                  />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Fecha</label>
+                  <input type="date" required value={formData.booking_date} onChange={e => setFormData({ ...formData, booking_date: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }} />
                 </div>
-
-                <div className="form-group">
-                  <label>Hora inicio * {horaSugerida && <span style={{ color: 'var(--color-success)', fontSize: '0.875rem', marginLeft: '0.5rem' }}>✨ Sugerido</span>}</label>
-                  <input
-                    type="time"
-                    required
-                    value={formData.start_time}
-                    onChange={(e) => handleStartTimeChange(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Hora fin *</label>
-                  <input
-                    type="time"
-                    required
-                    value={formData.end_time}
-                    readOnly
-                    style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
-                    title="Se calcula automáticamente según la duración del servicio"
-                  />
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Hora {horaSugerida && '✨'}</label>
+                  <input type="time" required value={formData.start_time} onChange={e => handleStartTimeChange(e.target.value)}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }} />
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>Notas</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Observaciones adicionales..."
-                  rows={3}
-                />
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Notas</label>
+                <textarea value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--color-border)' }} rows={3} />
               </div>
 
-              <div className="modal-actions">
-                <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary">
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  ✅ Crear Reserva
-                </button>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary" style={{ flex: 1 }}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Guardar</button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      <style>{`
-        .bookings-page {
-          padding: 2rem;
-          max-width: 1400px;
-          margin: 0 auto;
-        }
-
-        .page-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 2rem;
-        }
-
-        .page-header h1 {
-          margin: 0;
-          font-size: 2rem;
-        }
-
-        .filters {
-          display: flex;
-          gap: 1rem;
-          margin-bottom: 2rem;
-          flex-wrap: wrap;
-        }
-
-        .filter-btn {
-          padding: 0.75rem 1.5rem;
-          border: 2px solid #ddd;
-          border-radius: 12px;
-          background: white;
-          cursor: pointer;
-          font-size: 1rem;
-          font-weight: 500;
-          transition: all 0.2s;
-        }
-
-        .filter-btn:hover {
-          border-color: #007bff;
-          background: #f0f8ff;
-        }
-
-        .filter-btn.active {
-          background: #007bff;
-          color: white;
-          border-color: #007bff;
-        }
-
-        .bookings-list {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-          gap: 1.5rem;
-        }
-
-        .booking-card {
-          background: white;
-          border: 2px solid #e0e0e0;
-          border-radius: 16px;
-          padding: 1.5rem;
-          transition: all 0.3s;
-        }
-
-        .booking-card:hover {
-          box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-          transform: translateY(-2px);
-        }
-
-        .booking-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 1rem;
-          padding-bottom: 1rem;
-          border-bottom: 2px solid #f0f0f0;
-        }
-
-        .booking-info h3 {
-          margin: 0 0 0.5rem 0;
-          font-size: 1.4rem;
-          color: #333;
-        }
-
-        .service-name {
-          margin: 0;
-          color: #666;
-          font-size: 1.1rem;
-        }
-
-        .btn-whatsapp {
-          background: #25D366;
-          border: none;
-          padding: 0.75rem 1.25rem;
-          border-radius: 12px;
-          cursor: pointer;
-          font-size: 1.1rem;
-          font-weight: 600;
-          color: white;
-          transition: all 0.2s;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        .btn-whatsapp:hover {
-          background: #20ba5a;
-          transform: scale(1.05);
-        }
-
-        .whatsapp-icon {
-          font-size: 1.5rem;
-        }
-
-        .booking-details {
-          margin: 1rem 0;
-        }
-
-        .booking-details p {
-          margin: 0.75rem 0;
-          font-size: 1.05rem;
-          color: #555;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        .booking-details strong {
-          font-size: 1.2rem;
-        }
-
-        .notes {
-          background: #f8f9fa;
-          padding: 0.75rem;
-          border-radius: 8px;
-          font-style: italic;
-          color: #666;
-        }
-
-        .booking-footer {
-          margin-top: 1.5rem;
-          padding-top: 1rem;
-          border-top: 2px solid #f0f0f0;
-        }
-
-        .status-badge {
-          display: inline-block;
-          padding: 0.5rem 1rem;
-          border-radius: 20px;
-          color: white;
-          font-weight: 700;
-          font-size: 0.9rem;
-          margin-bottom: 1rem;
-          letter-spacing: 0.5px;
-        }
-
-        .booking-actions {
-          display: flex;
-          gap: 0.75rem;
-          flex-wrap: wrap;
-        }
-
-        .action-btn {
-          padding: 0.75rem 1.25rem;
-          border: 2px solid;
-          border-radius: 10px;
-          cursor: pointer;
-          font-size: 1rem;
-          font-weight: 600;
-          transition: all 0.2s;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        .action-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-
-        .btn-confirm {
-          background: #28a745;
-          color: white;
-          border-color: #28a745;
-        }
-
-        .btn-confirm:hover {
-          background: #218838;
-        }
-
-        .btn-complete {
-          background: #17a2b8;
-          color: white;
-          border-color: #17a2b8;
-        }
-
-        .btn-complete:hover {
-          background: #138496;
-        }
-
-        .btn-cancel {
-          background: #ffc107;
-          color: #333;
-          border-color: #ffc107;
-        }
-
-        .btn-cancel:hover {
-          background: #e0a800;
-        }
-
-        .btn-delete {
-          background: #dc3545;
-          color: white;
-          border-color: #dc3545;
-        }
-
-        .btn-delete:hover {
-          background: #c82333;
-        }
-
-        .empty-state {
-          text-align: center;
-          padding: 4rem 2rem;
-          background: #f8f9fa;
-          border-radius: 16px;
-          border: 2px dashed #ddd;
-        }
-
-        .empty-icon {
-          font-size: 4rem;
-          margin-bottom: 1rem;
-        }
-
-        .empty-text {
-          font-size: 1.2rem;
-          color: #666;
-          margin-bottom: 2rem;
-        }
-
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0,0,0,0.6);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-        }
-
-        .modal-content {
-          background: white;
-          padding: 2.5rem;
-          border-radius: 20px;
-          max-width: 600px;
-          width: 90%;
-          max-height: 90vh;
-          overflow-y: auto;
-        }
-
-        .modal-content h2 {
-          margin-top: 0;
-          font-size: 1.8rem;
-        }
-
-        .form-group {
-          margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-          display: block;
-          margin-bottom: 0.5rem;
-          font-weight: 600;
-          font-size: 1.05rem;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-          width: 100%;
-          padding: 0.875rem;
-          border: 2px solid #ddd;
-          border-radius: 10px;
-          font-size: 1rem;
-          transition: border-color 0.2s;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-          outline: none;
-          border-color: #007bff;
-        }
-
-        .form-row {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-          gap: 1rem;
-        }
-
-        .modal-actions {
-          display: flex;
-          gap: 1rem;
-          justify-content: flex-end;
-          margin-top: 2rem;
-        }
-
-        .btn {
-          padding: 0.875rem 1.75rem;
-          border: none;
-          border-radius: 10px;
-          cursor: pointer;
-          font-size: 1.05rem;
-          font-weight: 600;
-          transition: all 0.2s;
-        }
-
-        .btn-primary {
-          background: #007bff;
-          color: white;
-        }
-
-        .btn-primary:hover {
-          background: #0056b3;
-          transform: translateY(-2px);
-        }
-
-        .btn-secondary {
-          background: #6c757d;
-          color: white;
-        }
-
-        .btn-secondary:hover {
-          background: #545b62;
-        }
-
-        .loading {
-          text-align: center;
-          padding: 3rem;
-          font-size: 1.2rem;
-        }
-
-        @media (max-width: 768px) {
-          .bookings-list {
-            grid-template-columns: 1fr;
-          }
-
-          .booking-actions {
-            flex-direction: column;
-          }
-
-          .action-btn {
-            width: 100%;
-            justify-content: center;
-          }
-
-          .whatsapp-text {
-            display: none;
-          }
-        }
-      `}</style>
     </div>
   )
 }
